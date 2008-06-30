@@ -17,6 +17,9 @@ require 'uri'
 # Services should be created using ::create instead of ::new.  This allows a
 # subclass of Service to be automatically instantiated.
 #
+# When creating a service subclass, it must have a URN_version constant set to
+# the schema URN for that version.
+#
 # For details on UPnP services, see http://www.upnp.org/resources/documents.asp
 
 class UPnP::Control::Service
@@ -28,7 +31,7 @@ class UPnP::Control::Service
   end
 
   ##
-  # Error raised when an action was incorrectly called
+  # Error raised when there was an error while calling an action
 
   class UPnPError < Error
 
@@ -38,7 +41,7 @@ class UPnP::Control::Service
     attr_accessor :code
 
     ##
-    # The UPnP fauld description
+    # The UPnP fault description
 
     attr_accessor :description
 
@@ -216,11 +219,12 @@ class UPnP::Control::Service
     type = description.elements['serviceType'].text.strip
     klass_name = type.sub(/#{UPnP::SERVICE_SCHEMA_PREFIX}:([^:]+):.*/, '\1')
 
-    klass = begin
-              const_get klass_name
-            rescue NameError
-              const_set klass_name, Class.new(self)
-            end
+    begin
+      klass = const_get klass_name
+    rescue NameError
+      klass = const_set klass_name, Class.new(self)
+      klass.const_set :URN_1, "#{UPnP::SERVICE_SCHEMA_PREFIX}:#{klass.name}:1"
+    end
 
     klass.new description, url
   end

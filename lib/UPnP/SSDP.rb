@@ -15,12 +15,16 @@ require 'UPnP/control'
 # To listen for SSDP notifications from UPnP devices:
 #
 #   ssdp = SSDP.new
-#   ssdp.listen
+#   notifications = ssdp.listen
 #
 # To discover all devices and services:
 #
-#  ssdp = SSDP.new
-#  ssdp.search
+#   ssdp = SSDP.new
+#   resources = ssdp.search
+#
+# After a device has been found you can create a Device object for it:
+#
+#   UPnP::Control::Device.create resource.location
 #
 # Based on code by Kazuhiro NISHIYAMA (zn@mbf.nifty.com)
 
@@ -54,7 +58,9 @@ class UPnP::SSDP
   end
 
   ##
-  # Holds information about a NOTIFY message
+  # Holds information about a NOTIFY message.  For an alive notification, all
+  # fields will be present.  For a byebye notification, location, max_age and
+  # server will be nil.
 
   class Notification < Advertisement
 
@@ -99,7 +105,7 @@ class UPnP::SSDP
     attr_reader :server
 
     ##
-    # Advertisement sub-type
+    # \Notification sub-type
 
     attr_reader :sub_type
 
@@ -136,7 +142,7 @@ class UPnP::SSDP
     end
 
     ##
-    # Creates a new Notification
+    # Creates a \new Notification
 
     def initialize(date, max_age, host, port, location, type, sub_type,
                    server, name)
@@ -413,7 +419,7 @@ class UPnP::SSDP
   #
   # Supply no arguments to search for all devices and services.
   #
-  # Supply +:root+ to search for root devices only.
+  # Supply <tt>:root</tt> to search for root devices only.
   #
   # Supply <tt>[:device, 'device_type:version']</tt> to search for a specific
   # device type.

@@ -15,6 +15,9 @@ require 'UPnP/control/service'
 # Devices should be created using ::create instead of ::new.  This allows a
 # subclass of Device to be automatically instantiated.
 #
+# When creating a device subclass, it must have a URN_version constant set to
+# the schema URN for that version.
+#
 # For details on UPnP devices, see http://www.upnp.org/resources/documents.asp
 
 class UPnP::Control::Device
@@ -117,11 +120,12 @@ class UPnP::Control::Device
     type = description.elements['root/device/deviceType'].text.strip
     klass_name = type.sub(/#{UPnP::DEVICE_SCHEMA_PREFIX}:([^:]+):.*/, '\1')
 
-    klass = begin
-              const_get klass_name
-            rescue NameError
-              const_set klass_name, Class.new(self)
-            end
+    begin
+      klass = const_get klass_name
+    rescue NameError
+      klass = const_set klass_name, Class.new(self)
+      klass.const_set :URN_1, "#{UPnP::DEVICE_SCHEMA_PREFIX}:#{klass.name}:1"
+    end
 
     klass.new description.elements['root/device'], url
   end

@@ -1,10 +1,12 @@
 = UPnP
 
 * http://seattlerb.org/UPnP
+* http://upnp.org
+* Bugs: http://rubyforge.org/tracker/?atid=5921&group_id=1513
 
 == DESCRIPTION:
 
-An implementation of the UPnP protocol.
+An implementation of the UPnP protocol
 
 == FEATURES/PROBLEMS:
 

@@ -39,7 +39,11 @@ class TestUPnPControlService < UPnP::TestCase
   def test_self_create
     device = UPnP::Control::Service.create @service_description, @url
 
-    assert_equal UPnP::Control::Service::Layer3Forwarding, device.class
+    l3f = UPnP::Control::Service::Layer3Forwarding
+    assert_equal l3f, device.class
+
+    assert l3f.constants.include?('URN_1'), 'URN_1 constant missing'
+    assert_equal "#{UPnP::SERVICE_SCHEMA_PREFIX}:#{l3f.name}:1", l3f::URN_1
   ensure
     UPnP::Control::Service.send :remove_const, :Layer3Forwarding
   end
