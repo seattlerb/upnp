@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+
+require 'UPnP/SSDP'
+require 'UPnP/control'
+
+ssdp = UPnP::SSDP.new
+
+ssdp.discover do |notification|
+  schemas = Regexp.union UPnP::DEVICE_SCHEMA_PREFIX, UPnP::SERVICE_SCHEMA_PREFIX
+
+  type = notification.type.sub(/#{schemas}:/, '')
+
+  if notification.alive? then
+    puts "#{type} is alive"
+    puts "Description: #{notification.location}"
+    expiration = notification.expiration.strftime '%c'
+    puts "Valid until #{expiration}"
+  else
+    puts "#{type} says byebye"
+  end
+
+  puts "USN: #{notification.name}"
+
+  puts
+end
+

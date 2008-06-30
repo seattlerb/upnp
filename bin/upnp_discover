@@ -1,0 +1,82 @@
+#!/usr/bin/env ruby
+
+require 'UPnP/SSDP'
+require 'UPnP/control'
+
+ssdp = UPnP::SSDP.new
+timeout = ARGV.shift
+timeout = if timeout then
+            begin
+              timeout = Integer timeout
+            rescue
+              abort <<-EOF
+Usage: #{$0} [timeout]
+
+Prints information about UPnP internet gateway devices
+              EOF
+            end
+          else
+            1
+          end
+
+ssdp.timeout = timeout
+
+devices = ssdp.search(:root).map do |resource|
+  UPnP::Control::Device.new resource.location
+end
+
+if devices.empty? then
+  puts 'No UPnP devices found'
+  exit
+end
+
+def print_device(device, indent = '  ')
+  out = []
+
+  out << "Friendly name: #{device.friendly_name}"
+  out << "Presentation URL: #{device.presentation_url}"
+  out << nil
+  out << "Unique device name: #{device.name}"
+  out << nil
+  out << "Manufacturer: #{device.manufacturer}"
+  out << "Manufacturer URL: #{device.manufacturer_url}"
+  out << nil
+  out << "Model name: #{device.model_name}"
+  out << "Model description: #{device.model_description}"
+  out << "Model URL: #{device.model_url}"
+  out << "UPC: #{device.upc}"
+  out << "Serial number: #{device.serial_number}"
+  out << nil
+
+  puts indent + out.join("\n#{indent}")
+end
+
+devices.each do |device|
+  type = device.type.sub "#{UPnP::DEVICE_SCHEMA_PREFIX}:", ''
+  puts "#{device.url}: #{type}"
+  print_device device
+
+  device.devices.each do |sub_device|
+    type = sub_device.type.sub "#{UPnP::DEVICE_SCHEMA_PREFIX}:", ''
+    puts "  Sub-device #{type}:"
+    print_device sub_device, '    '
+  end
+
+  device.services.each do |service|
+    type = service.type.sub("#{UPnP::DEVICE_SCHEMA_PREFIX}:", '')
+    puts "  Service: #{type}"
+    puts "    Id: #{service.id}"
+    puts "    Type: #{service.type}"
+    puts "    SCPD URL: #{service.scpd_url}"
+    puts "    Control URL: #{service.control_url}"
+    puts "    Event subscription URL: #{service.event_sub_url}"
+    puts
+    puts "    Actions:"
+    service.driver.methods(false).sort.each do |method|
+      puts "      #{method}"
+    end
+
+    puts
+  end
+end
+

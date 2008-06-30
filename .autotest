@@ -1,0 +1,30 @@
+# vim: filetype=ruby
+
+Autotest.add_hook :initialize do |at|
+
+  at.add_mapping %r%^lib/UPnP/SSDP.rb$% do
+    ['test/test_UPnP_SSDP.rb',
+     'test/test_UPnP_SSDP_notification.rb',
+     'test/test_UPnP_SSDP_response.rb',
+    ]
+  end
+
+  at.add_mapping %r%^lib/UPnP/control/(\w+).rb$% do |_,m|
+    "test/test_UPnP_Control_#{m[1].capitalize}.rb"
+  end
+
+  at.add_mapping %r%^test/utilities.rb$% do
+    at.known_files
+  end
+
+  at.extra_class_map["TestUPnPControlDevice"] =
+    'test/test_UPnP_control_device.rb'
+  at.extra_class_map["TestUPnPSSDP"] = 'test/test_UPnP_SSDP.rb'
+  at.extra_class_map["TestUPnPSSDPNotification"] =
+    'test/test_UPnP_SSDP_notification.rb'
+  at.extra_class_map["TestUPnPSSDPResponse"] =
+    'test/test_UPnP_SSDP_response.rb'
+  at.extra_class_map["TestUPnPControlService"] =
+    'test/test_UPnP_control_service.rb'
+end
+
