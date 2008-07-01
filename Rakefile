@@ -7,6 +7,8 @@ require './lib/upnp.rb'
 Hoe.new('UPnP', UPnP::VERSION) do |p|
   p.rubyforge_name = 'seattlerb'
   p.developer('Eric Hodel', 'drbrain@segment7.net')
+
+  p.extra_deps << 'soap4r'
 end
 
 # vim: syntax=Ruby
