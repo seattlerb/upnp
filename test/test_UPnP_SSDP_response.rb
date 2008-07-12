@@ -5,6 +5,8 @@ require 'UPnP/SSDP'
 class TestUPnPSSDPResponse < UPnP::TestCase
 
   def setup
+    super
+
     @response = UPnP::SSDP::Response.parse util_search_response
   end
 

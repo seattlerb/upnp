@@ -9,6 +9,7 @@ Hoe.new('UPnP', UPnP::VERSION) do |p|
   p.developer('Eric Hodel', 'drbrain@segment7.net')
 
   p.extra_deps << 'soap4r'
+  p.extra_deps << 'builder'
 end
 
 # vim: syntax=Ruby

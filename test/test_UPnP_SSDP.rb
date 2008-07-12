@@ -1,10 +1,13 @@
 require 'test/unit'
 require 'test/utilities'
 require 'UPnP/SSDP'
+require 'UPnP/device'
 
 class TestUPnPSSDP < UPnP::TestCase
 
   def setup
+    super
+
     @ssdp = UPnP::SSDP.new
     @ssdp.timeout = 0
   end
@@ -20,15 +23,6 @@ class TestUPnPSSDP < UPnP::TestCase
     notifications = @ssdp.discover
 
     assert_equal [], socket.sent
-    assert_equal [Socket::INADDR_ANY, @ssdp.port], socket.bound
-
-    expected = [
-      [Socket::IPPROTO_IP, Socket::IP_TTL, [@ssdp.ttl].pack('i')],
-      [Socket::IPPROTO_IP, Socket::IP_ADD_MEMBERSHIP,
-       "\357\377\377\372\000\000\000\000"]
-    ]
-
-    assert_equal expected, socket.socket_options
 
     assert_equal 1, notifications.length
     assert_equal 'upnp:rootdevice', notifications.first.type
@@ -42,6 +36,24 @@ class TestUPnPSSDP < UPnP::TestCase
     notification = @ssdp.queue.pop
 
     assert_equal 'upnp:rootdevice', notification.type
+  end
+
+  def test_new_socket
+    UPnP::SSDP.send :const_set, :UDPSocket, UPnP::FakeSocket
+
+    socket = @ssdp.new_socket
+
+    ttl = [@ssdp.ttl].pack 'i'
+    expected = [
+      [Socket::IPPROTO_IP, Socket::IP_ADD_MEMBERSHIP, "\357\377\377\372\000\000\000\000"],
+      [Socket::IPPROTO_IP, Socket::IP_MULTICAST_LOOP, "\000"],
+      [Socket::IPPROTO_IP, Socket::IP_MULTICAST_TTL, ttl],
+      [Socket::IPPROTO_IP, Socket::IP_TTL, ttl],
+    ]
+
+    assert_equal expected, socket.socket_options
+  ensure
+    UPnP::SSDP.send :remove_const, :UDPSocket
   end
 
   def test_parse_bad
@@ -62,6 +74,12 @@ class TestUPnPSSDP < UPnP::TestCase
     assert_equal 'upnp:rootdevice', notification.type
   end
 
+  def test_parse_search
+    response = @ssdp.parse util_search
+
+    assert_equal 'upnp:rootdevice', response.target
+  end
+
   def test_parse_search_response
     response = @ssdp.parse util_search_response
 
@@ -74,8 +92,6 @@ class TestUPnPSSDP < UPnP::TestCase
 
     responses = @ssdp.search
 
-    assert_equal nil, socket.bound
-
     m_search = <<-M_SEARCH
 M-SEARCH * HTTP/1.1\r
 HOST: 239.255.255.250:1900\r
@@ -86,12 +102,6 @@ ST: ssdp:all\r
     M_SEARCH
 
     assert_equal [[m_search, 0, @ssdp.broadcast, @ssdp.port]], socket.sent
-
-    expected = [
-      [Socket::IPPROTO_IP, Socket::IP_TTL, [@ssdp.ttl].pack('i')],
-    ]
-
-    assert_equal expected, socket.socket_options
 
     assert_equal 1, responses.length
     assert_equal 'upnp:rootdevice', responses.first.target
@@ -203,6 +213,55 @@ ST: uuid:foo\r
     M_SEARCH
 
     assert_equal [[m_search, 0, @ssdp.broadcast, @ssdp.port]], socket.sent
+  end
+
+  def test_send_notify
+    socket = UPnP::FakeSocket.new
+    @ssdp.socket = socket
+
+    uri = 'http://127.255.255.255:65536/description'
+    device = UPnP::Device.new 'TestDevice', 'test device'
+
+    @ssdp.send_notify uri, 'upnp:rootdevice', device
+
+    search = <<-SEARCH
+NOTIFY * HTTP/1.1\r
+HOST: 239.255.255.250:1900\r
+CACHE-CONTROL: max-age=120\r
+LOCATION: #{uri}\r
+NT: upnp:rootdevice\r
+NTS: ssdp:alive\r
+SERVER: Ruby UPnP/#{UPnP::VERSION} UPnP/1.0 UPnP::Device::TestDevice/1.0.0\r
+USN: #{device.name}::upnp:rootdevice\r
+\r
+    SEARCH
+
+    assert_equal [[search, 0, @ssdp.broadcast, @ssdp.port]], socket.sent
+  end
+
+  def test_send_response
+    socket = UPnP::FakeSocket.new
+    @ssdp.socket = socket
+
+    uri = 'http://127.255.255.255:65536/description'
+    device = UPnP::Device.new 'TestDevice', 'test device'
+
+    @ssdp.send_response uri, 'upnp:rootdevice', device.name, device
+
+    search = <<-SEARCH
+HTTP/1.1 200 OK\r
+CACHE-CONTROL: max-age=120\r
+EXT:\r
+LOCATION: #{uri}\r
+SERVER: Ruby UPnP/#{UPnP::VERSION} UPnP/1.0 UPnP::Device::TestDevice/1.0.0\r
+ST: upnp:rootdevice\r
+NTS: ssdp:alive\r
+USN: #{device.name}\r
+Content-Length: 0\r
+\r
+    SEARCH
+
+    assert_equal [[search, 0, @ssdp.broadcast, @ssdp.port]], socket.sent
   end
 
   def test_send_search

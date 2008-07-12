@@ -5,6 +5,8 @@ require 'UPnP/control/service'
 class TestUPnPControlService < UPnP::TestCase
 
   def setup
+    super
+
     @url = URI.parse 'http://example.com'
     service_description = <<-XML
 <service>

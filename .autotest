@@ -6,6 +6,7 @@ Autotest.add_hook :initialize do |at|
     ['test/test_UPnP_SSDP.rb',
      'test/test_UPnP_SSDP_notification.rb',
      'test/test_UPnP_SSDP_response.rb',
+     'test/test_UPnP_SSDP_search.rb',
     ]
   end
 
@@ -19,11 +20,19 @@ Autotest.add_hook :initialize do |at|
 
   at.extra_class_map["TestUPnPControlDevice"] =
     'test/test_UPnP_control_device.rb'
+  at.extra_class_map["TestUPnPDevice"] =
+    'test/test_UPnP_device.rb'
+  at.extra_class_map["TestUPnPService"] =
+    'test/test_UPnP_service.rb'
+  at.extra_class_map["TestUPnPRootServer"] =
+    'test/test_UPnP_root_server.rb'
   at.extra_class_map["TestUPnPSSDP"] = 'test/test_UPnP_SSDP.rb'
   at.extra_class_map["TestUPnPSSDPNotification"] =
     'test/test_UPnP_SSDP_notification.rb'
   at.extra_class_map["TestUPnPSSDPResponse"] =
     'test/test_UPnP_SSDP_response.rb'
+  at.extra_class_map["TestUPnPSSDPSearch"] =
+    'test/test_UPnP_SSDP_search.rb'
   at.extra_class_map["TestUPnPControlService"] =
     'test/test_UPnP_control_service.rb'
 end

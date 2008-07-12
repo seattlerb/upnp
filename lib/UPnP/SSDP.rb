@@ -95,11 +95,6 @@ class UPnP::SSDP
     attr_reader :name
 
     ##
-    # Type of the advertised service or device
-
-    attr_reader :type
-
-    ##
     # Server name and version of the advertised service or device
 
     attr_reader :server
@@ -108,6 +103,11 @@ class UPnP::SSDP
     # \Notification sub-type
 
     attr_reader :sub_type
+
+    ##
+    # Type of the advertised service or device
+
+    attr_reader :type
 
     ##
     # Parses a NOTIFY advertisement into its component pieces
@@ -271,6 +271,48 @@ class UPnP::SSDP
   end
 
   ##
+  # Holds information about an M-SEARCH
+
+  class Search < Advertisement
+
+    attr_reader :date
+
+    attr_reader :target
+
+    attr_reader :wait_time
+
+    ##
+    # Creates a new Search by parsing the text in +response+
+
+    def self.parse(response)
+      response =~ /^mx:\s*(\d+)/i
+      wait_time = Integer $1
+
+      response =~ /^st:\s*(\S*)/i
+      target = $1.strip
+
+      new Time.now, target, wait_time
+    end
+
+    ##
+    # Creates a new Search
+
+    def initialize(date, target, wait_time)
+      @date = date
+      @target = target
+      @wait_time = wait_time
+    end
+
+    ##
+    # A friendlier inspect
+
+    def inspect
+      "#<#{self.class}:0x#{object_id.to_s 16} #{target}>"
+    end
+
+  end
+
+  ##
   # Default broadcast address
 
   BROADCAST = '239.255.255.250'
@@ -302,6 +344,11 @@ class UPnP::SSDP
   attr_accessor :listener # :nodoc:
 
   ##
+  # Thread that periodically notifies for advertise
+
+  attr_reader :notify_thread # :nodoc:
+
+  ##
   # Port to use for SSDP searching and listening
 
   attr_accessor :port
@@ -310,6 +357,11 @@ class UPnP::SSDP
   # Queue accessor for tests
 
   attr_accessor :queue # :nodoc:
+
+  ##
+  # Thread that handles search requests for advertise
+
+  attr_reader :search_thread # :nodoc:
 
   ##
   # Socket accessor for tests
@@ -338,6 +390,73 @@ class UPnP::SSDP
 
     @listener = nil
     @queue = Queue.new
+
+    @search_thread = nil
+    @notify_thread = nil
+  end
+
+  ##
+  # Listens for M-SEARCH requests and advertises the requested services
+
+  def advertise(root_device, port, hosts)
+    @socket ||= new_socket
+
+    @notify_thread = Thread.start do
+      loop do
+        hosts.each do |host|
+          uri = "http://#{host}:#{port}/description"
+
+          send_notify uri, 'ssdp:rootdevice', root_device
+
+          root_device.devices.each do |d|
+            send_notify uri, d.name, d
+            send_notify uri, d.type, d
+          end
+
+          root_device.services.each do |s|
+            send_notify uri, s.type, s
+          end
+        end
+
+        sleep 60
+      end
+    end
+
+    listen
+
+    @search_thread = Thread.start do
+      loop do
+        search = @queue.pop
+
+        break if search == :shutdown
+
+        next unless Search === search
+
+        case search.target
+        when /^#{UPnP::DEVICE_SCHEMA_PREFIX}/ then
+          devices = root_device.devices.select { |d| d.type == search.target }
+
+          devices.each do |d|
+            hosts.each do |host|
+              uri = "http://#{host}:#{port}/description"
+              send_response uri, search.target, "#{d.name}::#{search.target}", d
+            end
+          end
+        else
+          warn "Unhandled target #{search.target}"
+        end
+      end
+    end
+
+    sleep
+
+  ensure
+    @queue.push :shutdown
+    stop_listening
+    @notify_thread.kill
+
+    @socket.close if @socket and not @socket.closed?
+    @socket = nil
   end
 
   ##
@@ -348,14 +467,7 @@ class UPnP::SSDP
   # notifications received in that time.
 
   def discover
-    membership = IPAddr.new(@broadcast).hton + IPAddr.new('0.0.0.0').hton
-
-    @socket ||= UDPSocket.new
-
-    @socket.setsockopt Socket::IPPROTO_IP, Socket::IP_TTL, [@ttl].pack('i')
-    @socket.setsockopt Socket::IPPROTO_IP, Socket::IP_ADD_MEMBERSHIP, membership
-
-    @socket.bind Socket::INADDR_ANY, @port
+    @socket ||= new_socket
 
     listen
 
@@ -400,7 +512,24 @@ class UPnP::SSDP
   end
 
   ##
-  # Returns a Notification or Response created from +response+.
+  # Sets up a UDPSocket for multicast send and receive
+
+  def new_socket
+    membership = IPAddr.new(@broadcast).hton + IPAddr.new('0.0.0.0').hton
+    ttl = [@ttl].pack 'i'
+
+    socket = UDPSocket.new
+
+    socket.setsockopt Socket::IPPROTO_IP, Socket::IP_ADD_MEMBERSHIP, membership
+    socket.setsockopt Socket::IPPROTO_IP, Socket::IP_MULTICAST_LOOP, "\000"
+    socket.setsockopt Socket::IPPROTO_IP, Socket::IP_MULTICAST_TTL, ttl
+    socket.setsockopt Socket::IPPROTO_IP, Socket::IP_TTL, ttl
+
+    socket
+  end
+
+  ##
+  # Returns a Notification, Response or Search created from +response+.
 
   def parse(response)
     case response
@@ -408,6 +537,8 @@ class UPnP::SSDP
       Notification.parse response
     when /\AHTTP/ then
       Response.parse response
+    when /\AM-SEARCH/ then
+      Search.parse response
     else
       raise Error, "Unknown response #{response[/\A.*$/]}"
     end
@@ -432,9 +563,7 @@ class UPnP::SSDP
   # Supply <tt>"urn:..."</tt> to search for a URN.
 
   def search(*targets)
-    @socket ||= UDPSocket.new
-
-    @socket.setsockopt Socket::IPPROTO_IP, Socket::IP_TTL, [@ttl].pack('i')
+    @socket ||= new_socket
 
     if targets.empty? then
       send_search 'ssdp:all'
@@ -467,17 +596,68 @@ class UPnP::SSDP
   end
 
   ##
+  # Builds and sends a NOTIFY message
+
+  def send_notify(uri, type, obj)
+    if type =~ /^uuid:/ then
+      name = obj.name
+    else
+      name = "#{obj.root_device.name}::#{type}"
+    end
+
+    server_info = "Ruby UPnP/#{UPnP::VERSION}"
+    device_info = "#{obj.root_device.class}/#{obj.root_device.version}"
+
+    http_notify = <<-HTTP_NOTIFY
+NOTIFY * HTTP/1.1\r
+HOST: #{@broadcast}:#{@port}\r
+CACHE-CONTROL: max-age=120\r
+LOCATION: #{uri}\r
+NT: #{type}\r
+NTS: ssdp:alive\r
+SERVER: #{server_info} UPnP/1.0 #{device_info}\r
+USN: #{name}\r
+\r
+    HTTP_NOTIFY
+
+    @socket.send http_notify, 0, @broadcast, @port
+  end
+
+  ##
+  # Builds and sends a response to an M-SEARCH request"
+
+  def send_response(uri, type, name, device)
+    server_info = "Ruby UPnP/#{UPnP::VERSION}"
+    device_info = "#{device.root_device.class}/#{device.root_device.version}"
+
+    http_response = <<-HTTP_RESPONSE
+HTTP/1.1 200 OK\r
+CACHE-CONTROL: max-age=120\r
+EXT:\r
+LOCATION: #{uri}\r
+SERVER: #{server_info} UPnP/1.0 #{device_info}\r
+ST: #{type}\r
+NTS: ssdp:alive\r
+USN: #{name}\r
+Content-Length: 0\r
+\r
+    HTTP_RESPONSE
+
+    @socket.send http_response, 0, @broadcast, @port
+  end
+
+  ##
   # Builds and sends an M-SEARCH request looking for +search_target+.
 
   def send_search(search_target)
-    http_request = <<HTTP_REQUEST
+    http_request = <<-HTTP_REQUEST
 M-SEARCH * HTTP/1.1\r
 HOST: #{@broadcast}:#{@port}\r
 MAN: "ssdp:discover"\r
 MX: #{@timeout}\r
 ST: #{search_target}\r
 \r
-HTTP_REQUEST
+    HTTP_REQUEST
 
     @socket.send http_request, 0, @broadcast, @port
   end

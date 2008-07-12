@@ -1,4 +1,8 @@
+require 'fileutils'
+require 'tmpdir'
 require 'test/unit'
+require 'UPnP'
+require 'UPnP/device'
 
 module UPnP
 
@@ -67,22 +71,29 @@ module UPnP
 
   class TestCase < Test::Unit::TestCase
 
-    def teardown
-      UPnP::OpenStub::FILES.clear
+    undef_method :default_test
+
+    def setup
+      @tempdir = File.join Dir.tmpdir, "test_UPnP_#{$$}"
+      FileUtils.mkdir_p @tempdir
+
+      @home = File.join @tempdir, 'home'
+      FileUtils.mkdir_p @home
+
+      @orig_ENV_HOME = ENV['HOME']
+      ENV['HOME'] = @home
     end
 
-  def util_search_response
-    <<-SEARCH_RESPONSE
-HTTP/1.1 200 OK\r
-CACHE-CONTROL: max-age = 10\r
-EXT:\r
-LOCATION: http://example.com/root_device.xml\r
-SERVER: OS/5 UPnP/1.0 product/7\r
-ST: upnp:rootdevice\r
-USN: uuid:BOGUS::upnp:rootdevice\r
-\r
-    SEARCH_RESPONSE
-  end
+    def teardown
+      if @orig_ENV_HOME then
+        ENV['HOME'] = @orig_ENV_HOME
+      else
+        ENV.delete 'HOME'
+      end
+
+      FileUtils.rm_rf @tempdir
+      UPnP::OpenStub::FILES.clear
+    end
 
   def util_notify
     <<-NOTIFY
@@ -109,7 +120,28 @@ USN: uuid:BOGUS::upnp:rootdevice\r
     NOTIFY_BYEBYE
   end
 
-    undef_method :default_test
+  def util_search
+    <<-SEARCH
+M-SEARCH * HTTP/1.1
+HOST: 239.255.255.250:1900
+MAN: "ssdp:discover"
+MX: 2
+ST: upnp:rootdevice
+    SEARCH
+  end
+
+  def util_search_response
+    <<-SEARCH_RESPONSE
+HTTP/1.1 200 OK\r
+CACHE-CONTROL: max-age = 10\r
+EXT:\r
+LOCATION: http://example.com/root_device.xml\r
+SERVER: OS/5 UPnP/1.0 product/7\r
+ST: upnp:rootdevice\r
+USN: uuid:BOGUS::upnp:rootdevice\r
+\r
+    SEARCH_RESPONSE
+  end
 
     IGD_XML = <<-XML
 <?xml version="1.0"?>
@@ -1021,6 +1053,21 @@ USN: uuid:BOGUS::upnp:rootdevice\r
   </serviceStateTable>
 </scpd>
     XML
+
+  end
+
+  class Service::TestService < Service
+    add_action 'TestAction',
+      [IN,  'TestInput',  'TestInVar'],
+      [OUT, 'TestOutput', 'TestOutVar']
+
+    add_variable 'TestInVar', 'string'
+    add_variable 'TestOutVar', 'string'
+  end
+
+  class Device::TestDevice < Device
+
+    add_service_id UPnP::Service::TestService, 'TestService'
 
   end
 

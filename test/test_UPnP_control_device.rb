@@ -6,6 +6,8 @@ require 'UPnP/control/device'
 class TestUPnPControlDevice < UPnP::TestCase
 
   def setup
+    super
+
     @device_url = URI.parse 'http://example.com/device.xml'
 
     UPnP::OpenStub::FILES[@device_url] = StringIO.new UPnP::TestCase::IGD_XML
