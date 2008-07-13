@@ -176,6 +176,10 @@ class UPnP::Device
   ##
   # Loads a device of type +type+ and named +friendly_name+, or creates a new
   # device from +block+ and dumps it.
+  #
+  # If a dump exists for the same device type and friendly_name the dump is
+  # loaded and used as defaults.  This preserves the device name (UUID) across
+  # device restarts.
 
   def self.create(type, friendly_name, &block)
     klass = const_get type
@@ -183,15 +187,20 @@ class UPnP::Device
     device_definition = File.join '~', '.UPnP', type, friendly_name
     device_definition = File.expand_path device_definition
 
+    device = nil
+
     if File.exist? device_definition then
       open device_definition, 'rb' do |io|
-        return Marshal.load(io.read)
+        device = Marshal.load io.read
       end
+
+      yield device if block_given?
     else
       device = klass.new type, friendly_name, &block
-      device.dump
-      device
     end
+
+    device.dump
+    device
   rescue NameError => e
     raise unless e.message =~ /UPnP::Service::#{type}/
     raise Error, "unknown device type #{type}"
@@ -222,13 +231,13 @@ class UPnP::Device
   def initialize(type, friendly_name, parent_device = nil)
     @type = type
     @friendly_name = friendly_name
-    @sub_devices = []
-    @sub_services = []
-    @parent = parent_device
+    @sub_devices ||= []
+    @sub_services ||= []
+    @parent ||= parent_device
 
     yield self if block_given?
 
-    @name = "uuid:#{UPnP::UUID.generate}"
+    @name ||= "uuid:#{UPnP::UUID.generate}"
   end
 
   ##
@@ -239,12 +248,23 @@ class UPnP::Device
   end
 
   ##
-  # Adds a sub-device of +type+ with +friendly_name+
+  # Adds a sub-device of +type+ with +friendly_name+.  Devices must have
+  # unique types and friendly names.  A sub-device will not be created if it
+  # already exists, but the block will be called with the existing sub-device.
 
   def add_device(type, friendly_name = type, &block)
-    device = UPnP::Device.new(type, friendly_name, self, &block)
-    @sub_devices << device
-    device
+    sub_device = @sub_devices.find do |d|
+      d.type == type and d.friendly_name == friendly_name
+    end
+
+    if sub_device then
+      yield sub_device if block_given?
+      return sub_device
+    end
+
+    sub_device = UPnP::Device.new(type, friendly_name, self, &block)
+    @sub_devices << sub_device
+    sub_device
   end
 
   ##

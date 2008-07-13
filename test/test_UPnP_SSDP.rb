@@ -231,7 +231,7 @@ CACHE-CONTROL: max-age=120\r
 LOCATION: #{uri}\r
 NT: upnp:rootdevice\r
 NTS: ssdp:alive\r
-SERVER: Ruby UPnP/#{UPnP::VERSION} UPnP/1.0 UPnP::Device::TestDevice/1.0.0\r
+SERVER: Ruby UPnP/#{UPnP::VERSION} UPnP/1.0 #{util_device_version}\r
 USN: #{device.name}::upnp:rootdevice\r
 \r
     SEARCH
@@ -253,7 +253,7 @@ HTTP/1.1 200 OK\r
 CACHE-CONTROL: max-age=120\r
 EXT:\r
 LOCATION: #{uri}\r
-SERVER: Ruby UPnP/#{UPnP::VERSION} UPnP/1.0 UPnP::Device::TestDevice/1.0.0\r
+SERVER: Ruby UPnP/#{UPnP::VERSION} UPnP/1.0 #{util_device_version}\r
 ST: upnp:rootdevice\r
 NTS: ssdp:alive\r
 USN: #{device.name}\r
@@ -290,6 +290,10 @@ ST: bunnies\r
 
     assert_equal false, thread.alive?
     assert_equal nil, @ssdp.listener
+  end
+
+  def util_device_version
+    "UPnP::Device::TestDevice/#{UPnP::VERSION}"
   end
 
 end

@@ -18,6 +18,55 @@ class TestUPnPDevice < UPnP::TestCase
     @service = @device.add_service 'TestService'
   end
 
+  def test_self_create
+    device1 = UPnP::Device.create 'TestDevice', 'test device'
+
+    dump = File.join @home, '.UPnP', 'TestDevice', 'test device'
+
+    assert File.exist?(dump)
+
+    device2 = UPnP::Device.create 'TestDevice', 'test device'
+
+    assert_equal device1.name, device2.name, 'UUIDs not identical'
+  end
+
+  def test_self_create_edit
+    device1 = UPnP::Device.create 'TestDevice', 'test device' do |d|
+      d.manufacturer = 'manufacturer 1'
+
+      d.add_device 'TestDevice', 'embedded device' do |d2|
+        d2.manufacturer = 'embedded manufacturer'
+      end
+    end
+
+    device2 = UPnP::Device.create 'TestDevice', 'test device' do |d|
+      d.manufacturer = 'manufacturer 2'
+
+      d.add_device 'TestDevice', 'embedded device' do |d2|
+        d2.manufacturer = 'embedded manufacturer 2'
+      end
+    end
+
+    assert_equal device1.name, device2.name, 'UUIDs not identical'
+
+    assert_equal 2, device2.devices.length, 'wrong number of devices'
+
+    assert_equal device1.devices.last.name,
+                 device2.devices.last.name, 'sub-device UUIDs not identical'
+
+    assert_not_equal device2.name, device2.devices.last.name
+
+    assert_equal 'manufacturer 2', device2.manufacturer, 'block not called'
+    assert_equal 'embedded manufacturer 2',
+                 device2.devices.last.manufacturer,
+                 'sub-device block not called'
+
+    device3 = UPnP::Device.create 'TestDevice', 'test device'
+
+    assert_equal 'manufacturer 2', device3.manufacturer,
+                 'not dumped from Marshal'
+  end
+
   def test_initialize
     assert_kind_of UPnP::Device::TestDevice, @device
     assert_equal 'test device', @device.friendly_name
@@ -30,6 +79,17 @@ class TestUPnPDevice < UPnP::TestCase
     assert_equal 'TestDevice', @sub_device.type
 
     assert @device.sub_devices.include?(@sub_device)
+  end
+
+  def test_add_device_exists
+    device = @device.add_device @sub_device.type,
+                                @sub_device.friendly_name do |d|
+      d.manufacturer = 'new manufacturer'
+    end
+
+    assert_equal 2, @device.devices.length, 'wrong number of devices'
+
+    assert_equal 'new manufacturer', device.manufacturer
   end
 
   def test_add_service
