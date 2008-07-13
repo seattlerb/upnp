@@ -68,6 +68,11 @@ require 'fileutils'
 # #add_device can be used to add a sub-device.  Like ::create, it takes a type
 # and friendly name, and yield a block that you must set the manufacturer and
 # model name in, in addition to any required sub-devices and sub-services.
+#
+# = Running a UPnP Device
+#
+# After instantiating a device it will advertise itself to the network when
+# you call #run.
 
 class UPnP::Device
 
@@ -408,7 +413,9 @@ class UPnP::Device
   end
 
   ##
-  # Starts up this device and gets it running
+  # Starts a root server for the device and advertises it via SSDP.  INT and
+  # TERM signal handlers are automatically added, and exit when invoked.  This
+  # method won't return until the server is shutdown.
 
   def run
     setup_server
@@ -459,7 +466,7 @@ class UPnP::Device
   end
 
   ##
-  # Set up a server
+  # Creates a root server and attaches this device's services to it.
 
   def setup_server
     @server = UPnP::RootServer.new self

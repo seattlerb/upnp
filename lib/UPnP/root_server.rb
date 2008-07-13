@@ -1,6 +1,13 @@
 require 'UPnP'
 require 'webrick'
 
+##
+# Master WEBrick server that publishes a root device's sub-devices and
+# services for consumption by a UPnP control device.
+#
+# A root server is created automatiaclly for a device when you call #run on
+# your device instance.
+
 class UPnP::RootServer < WEBrick::HTTPServer
 
   ##
@@ -34,7 +41,7 @@ class UPnP::RootServer < WEBrick::HTTPServer
   end
 
   ##
-  # Returns the root device description
+  # Handler for the root device description
 
   def description(req, res)
     raise WEBrick::HTTPStatus::NotFound, "`#{req.path}' not found." unless
@@ -64,7 +71,7 @@ class UPnP::RootServer < WEBrick::HTTPServer
   end
 
   ##
-  # Handles a request for an SCPD
+  # Handler for a service control protocol description request
 
   def scpd(req, res)
     service = @scpds[req.path]
