@@ -10,15 +10,25 @@ An implementation of the UPnP protocol
 
 == FEATURES/PROBLEMS:
 
-* Discovers UPnP devices and services via SSDP, see UPnP::SSDP
-* Creates a SOAP RPC driver for discovered services, see UPnP::Control::Service
-* Creates concrete UPnP device and service classes that may be extended with
-  utility methods, see UPnP::Control::Device::create,
-  UPnP::Control::Service::create and the UPnP-IGD gem.
+* Client support:
+  * Discovers UPnP devices and services via SSDP, see UPnP::SSDP
+  * Creates a SOAP RPC driver for discovered services, see
+    UPnP::Control::Service
+  * Creates concrete UPnP device and service classes that may be extended with
+    utility methods, see UPnP::Control::Device::create,
+    UPnP::Control::Service::create and the UPnP-IGD gem.
+* Server support:
+  * Easy creation of device and service skeletons from UPnP specifications
+  * Advertises UPnP devices and services via SSDP
+  * Creates a SOAP RPC server for each service
+  * Mounts services in a single WEBrick server
 * Eventing not implemented
-* Servers not implemented
 
 == SYNOPSIS:
+
+See UPnP::Device for instructions on creating a UPnP device.
+
+See UPnP::Service for instructinos on creating a UPnP service.
 
 Print out information about UPnP devices nearby:
 
@@ -66,7 +76,7 @@ service, print out the external IP address for the gateway:
 
 == LICENSE:
 
-All code copyright 2008 Eric Hodel.  All rights reserved.
+Original code copyright 2008 Eric Hodel.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions

@@ -1,7 +1,53 @@
 require 'UPnP'
 require 'soap/rpc/standaloneServer'
 
+##
+# A service contains a SOAP endpoint and the Service Control Protocol
+# Definition (SCPD).  It acts as a SOAP server that is mounted onto the
+# RootServer along with the containing devices and other devices and services
+# in a UPnP device.
+#
+# = Creating a UPnP::Service class
+#
+# A concrete UPnP service looks like this:
+#
+#   require 'UPnP/service'
+#   
+#   class UPnP::Service::ContentDirectory < UPnP::Service
+#   
+#     add_action 'Browse',
+#       [IN, 'ObjectID',       'A_ARG_TYPE_ObjectID'],
+#       # ...
+#   
+#       [OUT, 'Result',         'A_ARG_TYPE_Result'],
+#       # ...
+#   
+#     add_variable 'A_ARG_TYPE_ObjectID', 'string'
+#     add_variable 'A_ARG_TYPE_Result',   'string'
+#   end
+#
+# Subclass UPnP::Service in the UPnP::Service namespace.  UPnP::Service looks
+# in its own namespace for various information when instantiating the service.
+#
+# #add_action defines a service's action.  The action's arguments follow the
+# name as arrays of direction (IN, OUT, RETVAL), argument name, and related
+# state variable.
+#
+# #add_variable defines a state table variable.  The name is followed by the
+# type, allowed values, default value and whether or not the variable is
+# evented.
+#
+# = Instantiating  a UPnP::Service
+#
+# A UPnP::Service will be instantiated automatically for you if you call
+# add_service in the UPnP::Device initialization block.  If you want to
+# instantiate a service by hand, use ::create to pick the correct subclass
+# automatically.
+
 class UPnP::Service < SOAP::RPC::StandaloneServer
+
+  ##
+  # Base service error class
 
   class Error < UPnP::Error
   end
@@ -42,7 +88,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   attr_reader :device
 
   ##
-  # This service's type
+  # Type of UPnP service.  Use type_urn for the full URN
 
   attr_reader :type
 
@@ -80,7 +126,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
     @device = device
     @type = type
 
-    super @type, "#{UPnP::SERVICE_SCHEMA_PREFIX}:#{type}:1"
+    super @type, type_urn
 
     add_actions
   end
@@ -109,7 +155,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   end
 
   ##
-  # Tell the StandaloneServer to not listen
+  # Tell the StandaloneServer to not listen, RootServer does this for us
 
   def create_config
     hash = super
@@ -122,7 +168,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
 
   def description(xml)
     xml.service do
-      xml.serviceType [UPnP::SERVICE_SCHEMA_PREFIX, @type, '1'].join(':')
+      xml.serviceType type_urn
       xml.serviceId   "urn:upnp-org:serviceId:#{root_device.service_id self}"
       xml.SCPDURL     scpd_url
       xml.controlURL  control_url
@@ -252,8 +298,11 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
     File.join device_path, @type
   end
 
+  ##
+  # URN of this service's type
+
   def type_urn
-    "#{UPnP::SERVICE_SCHEMA_PREFIX}:#{self.class.name.sub(/.*:/, '')}:1"
+    "#{UPnP::SERVICE_SCHEMA_PREFIX}:#{@type}:1"
   end
 
   ##

@@ -8,8 +8,66 @@ require 'fileutils'
 
 ##
 # A device contains sub devices, services and holds information about the
-# services provided.  In order to maintain UUIDs across startups, use ::create
-# instead of ::new.
+# services provided.  If you use ::create, UPnP will maintain device UUIDs
+# across startups.
+#
+# = Creating a UPnP::Device class
+#
+# A concrete UPnP device looks like this:
+#
+#   require 'UPnP/device'
+#   require 'UPnP/service/content_directory'
+#   require 'UPnP/service/connection_manager'
+#   
+#   class UPnP::Device::MediaServer < UPnP::Device
+#     VERSION = '1.0'
+#   
+#     add_service_id UPnP::Service::ContentDirectory, 'ContentDirectory'
+#     add_service_id UPnP::Service::ConnectionManager, 'ConnectorManager'
+#   end
+#
+# Require the sub-services and sub-devices this device requires.  For a
+# MediaServer, only a ContentDirectory and ConnectionManager service is
+# required.
+#
+# Subclass UPnP::Device in the UPnP::Device namespace.  UPnP::Device looks in
+# its own namespace for various information when instantiating the device.
+#
+# Add a VERSION constant for your device implementation.  This will be
+# reported in device advertisements.
+#
+# Add the service ids defined in the device specification document.  Not every
+# service's type matches up to its service id.
+#
+# = Instantiating a UPnP::Device
+#
+# A device instantiation looks like this:
+#
+#   name = Socket.gethostname.split('.', 2).first
+#   
+#   device = UPnP::Device.create 'MediaServer', name do |ms|
+#     ms.manufacturer = 'Eric Hodel'
+#     ms.model_name = 'Media Server'
+#   
+#     ms.add_service 'ContentDirectory'
+#     ms.add_service 'ConnectionManager'
+#   end
+#
+# The first argument to ::create is the device type.  UPnP looks in the
+# UPnP::Device namespace for a constant matching this name.  The second is the
+# friendly name of the device.  (A hostname-based name seems sane enough for
+# this example.)
+#
+# Various UPnP device settings can be given next.  The manufacturer and model
+# name are required by the UPnP specification.  The remainder are attributes
+# you can see below.
+#
+# add_service adds a service of the given type to the device.  UPnP looks in
+# the UPnP::Service namespace for a constant matching this name.
+#
+# #add_device can be used to add a sub-device.  Like ::create, it takes a type
+# and friendly name, and yield a block that you must set the manufacturer and
+# model name in, in addition to any required sub-devices and sub-services.
 
 class UPnP::Device
 
@@ -134,6 +192,10 @@ class UPnP::Device
     raise Error, "unknown device type #{type}"
   end
 
+  ##
+  # Creates an instance of the UPnP::Device subclass named +type+ if it is in
+  # the UPnP::Device namespace.
+
   def self.new(type, *args)
     if UPnP::Device == self then
       klass = begin
@@ -235,7 +297,7 @@ class UPnP::Device
     validate
 
     xml.device do
-      xml.deviceType       "#{UPnP::DEVICE_SCHEMA_PREFIX}:#{@type}:1"
+      xml.deviceType       type_urn
       xml.UDN              @name
 
       xml.friendlyName     @friendly_name
@@ -270,6 +332,9 @@ class UPnP::Device
     end
   end
 
+  ##
+  # This device and all its sub-devices
+
   def devices
     [self] + @sub_devices.map do |device|
       device.devices
@@ -291,6 +356,9 @@ class UPnP::Device
     end
   end
 
+  ##
+  # Custom Marshal method that only dumps device-specific data.
+
   def marshal_dump
     [
       @type,
@@ -310,6 +378,9 @@ class UPnP::Device
     ]
   end
 
+  ##
+  # Custom Marshal method that only loads device-specific data.
+
   def marshal_load(data)
     @type              = data.shift
     @friendly_name     = data.shift
@@ -328,7 +399,7 @@ class UPnP::Device
   end
 
   ##
-  # The root device
+  # This device's root device
 
   def root_device
     device = self
@@ -404,7 +475,7 @@ class UPnP::Device
   # URN of this device's type
 
   def type_urn
-    "#{UPnP::DEVICE_SCHEMA_PREFIX}:#{self.class.name.sub(/.*:/, '')}:1"
+    "#{UPnP::DEVICE_SCHEMA_PREFIX}:#{@type}:1"
   end
 
   ##
