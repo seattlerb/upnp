@@ -118,13 +118,13 @@ class TestUPnPService < UPnP::TestCase
       <name>TestAction</name>
       <argumentList>
         <argument>
-          <name>in</name>
-          <direction>TestInput</direction>
+          <direction>in</direction>
+          <name>TestInput</name>
           <relatedStateVariable>TestInVar</relatedStateVariable>
         </argument>
         <argument>
-          <name>out</name>
-          <direction>TestOutput</direction>
+          <direction>out</direction>
+          <name>TestOutput</name>
           <relatedStateVariable>TestOutVar</relatedStateVariable>
         </argument>
       </argumentList>
@@ -148,6 +148,10 @@ class TestUPnPService < UPnP::TestCase
 
   def test_scpd_url
     assert_equal '/TestDevice/TestService', @service.scpd_url
+  end
+
+  def test_service_path
+    assert_equal '/TestDevice/TestService', @service.service_path
   end
 
   def test_type_urn

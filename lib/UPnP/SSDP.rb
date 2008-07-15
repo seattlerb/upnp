@@ -344,6 +344,11 @@ class UPnP::SSDP
   attr_accessor :listener # :nodoc:
 
   ##
+  # A WEBrick::Log logger for unified logging
+
+  attr_writer :log
+
+  ##
   # Thread that periodically notifies for advertise
 
   attr_reader :notify_thread # :nodoc:
@@ -388,6 +393,8 @@ class UPnP::SSDP
     @timeout = TIMEOUT
     @ttl = TTL
 
+    @log = nil
+
     @listener = nil
     @queue = Queue.new
 
@@ -406,15 +413,15 @@ class UPnP::SSDP
         hosts.each do |host|
           uri = "http://#{host}:#{port}/description"
 
-          send_notify uri, 'ssdp:rootdevice', root_device
+          send_notify uri, 'upnp:rootdevice', root_device
 
           root_device.devices.each do |d|
             send_notify uri, d.name, d
-            send_notify uri, d.type, d
+            send_notify uri, d.type_urn, d
           end
 
           root_device.services.each do |s|
-            send_notify uri, s.type, s
+            send_notify uri, s.type_urn, s
           end
         end
 
@@ -434,13 +441,20 @@ class UPnP::SSDP
 
         case search.target
         when /^#{UPnP::DEVICE_SCHEMA_PREFIX}/ then
-          devices = root_device.devices.select { |d| d.type == search.target }
+          devices = root_device.devices.select do |d|
+            d.type_urn == search.target
+          end
 
           devices.each do |d|
             hosts.each do |host|
               uri = "http://#{host}:#{port}/description"
               send_response uri, search.target, "#{d.name}::#{search.target}", d
             end
+          end
+        when 'upnp:rootdevice' then
+          hosts.each do |host|
+            uri = "http://#{host}:#{port}/description"
+            send_response uri, search.target, search.target, root_device
           end
         else
           warn "Unhandled target #{search.target}"
@@ -457,6 +471,23 @@ class UPnP::SSDP
 
     @socket.close if @socket and not @socket.closed?
     @socket = nil
+  end
+
+  def byebye(root_device, hosts)
+    @socket ||= new_socket
+
+    hosts.each do |host|
+      send_notify_byebye 'upnp:rootdevice', root_device
+
+      root_device.devices.each do |d|
+        send_notify_byebye d.name, d
+        send_notify_byebye d.type_urn, d
+      end
+
+      root_device.services.each do |s|
+        send_notify_byebye s.type_urn, s
+      end
+    end
   end
 
   ##
@@ -499,16 +530,34 @@ class UPnP::SSDP
 
     @listener = Thread.start do
       loop do
-        response = @socket.recvfrom(1024).first
+        response, (family, port, hostname, address) = @socket.recvfrom 1024
 
         begin
-          @queue << parse(response)
+          adv = parse response
+
+          info = case adv
+          when Notification then adv.type
+          when Response     then adv.target
+          when Search       then adv.target
+          else                   'unknown'
+          end
+
+          response =~ /\A(\S+)/
+          log :debug, "SSDP recv #{$1} #{hostname}:#{port} #{info}"
+
+          @queue << adv
         rescue
-          puts $!.message
-          puts $!.backtrace
+          warn $!.message
+          warn $!.backtrace
         end
       end
     end
+  end
+
+  def log(level, message)
+    return unless @log
+
+    @log.send level, message
   end
 
   ##
@@ -524,6 +573,8 @@ class UPnP::SSDP
     socket.setsockopt Socket::IPPROTO_IP, Socket::IP_MULTICAST_LOOP, "\000"
     socket.setsockopt Socket::IPPROTO_IP, Socket::IP_MULTICAST_TTL, ttl
     socket.setsockopt Socket::IPPROTO_IP, Socket::IP_TTL, ttl
+
+    socket.bind '0.0.0.0', @port
 
     socket
   end
@@ -545,7 +596,7 @@ class UPnP::SSDP
   end
 
   ##
-  # Broadcasts M-SEARCH requests looking for +targets+.  Waits timeout seconds
+  # Sends M-SEARCH requests looking for +targets+.  Waits timeout seconds
   # for responses then returns the collected responses.
   #
   # Supply no arguments to search for all devices and services.
@@ -602,6 +653,7 @@ class UPnP::SSDP
     if type =~ /^uuid:/ then
       name = obj.name
     else
+      # HACK maybe this should be .device?
       name = "#{obj.root_device.name}::#{type}"
     end
 
@@ -619,6 +671,33 @@ SERVER: #{server_info} UPnP/1.0 #{device_info}\r
 USN: #{name}\r
 \r
     HTTP_NOTIFY
+
+    log :debug, "SSDP sent NOTIFY #{type}"
+
+    @socket.send http_notify, 0, @broadcast, @port
+  end
+
+  ##
+  # Builds and sends a byebye NOTIFY message
+
+  def send_notify_byebye(type, obj)
+    if type =~ /^uuid:/ then
+      name = obj.name
+    else
+      # HACK maybe this should be .device?
+      name = "#{obj.root_device.name}::#{type}"
+    end
+
+    http_notify = <<-HTTP_NOTIFY
+NOTIFY * HTTP/1.1\r
+HOST: #{@broadcast}:#{@port}\r
+NT: #{type}\r
+NTS: ssdp:byebye\r
+USN: #{name}\r
+\r
+    HTTP_NOTIFY
+
+    log :debug, "SSDP sent byebye #{type}"
 
     @socket.send http_notify, 0, @broadcast, @port
   end
@@ -643,6 +722,8 @@ Content-Length: 0\r
 \r
     HTTP_RESPONSE
 
+    log :debug, "SSDP sent M-SEARCH OK #{type}"
+
     @socket.send http_response, 0, @broadcast, @port
   end
 
@@ -650,7 +731,7 @@ Content-Length: 0\r
   # Builds and sends an M-SEARCH request looking for +search_target+.
 
   def send_search(search_target)
-    http_request = <<-HTTP_REQUEST
+    search = <<-HTTP_REQUEST
 M-SEARCH * HTTP/1.1\r
 HOST: #{@broadcast}:#{@port}\r
 MAN: "ssdp:discover"\r
@@ -659,7 +740,9 @@ ST: #{search_target}\r
 \r
     HTTP_REQUEST
 
-    @socket.send http_request, 0, @broadcast, @port
+    log :debug, "SSDP sent M-SEARCH #{search_target}"
+
+    @socket.send search, 0, @broadcast, @port
   end
 
   ##

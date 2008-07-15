@@ -1,5 +1,6 @@
 require 'UPnP'
 require 'soap/rpc/standaloneServer'
+require 'soap/filter/handler'
 
 ##
 # A service contains a SOAP endpoint and the Service Control Protocol
@@ -24,10 +25,19 @@ require 'soap/rpc/standaloneServer'
 #   
 #     add_variable 'A_ARG_TYPE_ObjectID', 'string'
 #     add_variable 'A_ARG_TYPE_Result',   'string'
+#   
+#     def Browse(object_id, ...)
+#       # ...
+#   
+#       [nil, result]
+#     end
+#     
 #   end
 #
 # Subclass UPnP::Service in the UPnP::Service namespace.  UPnP::Service looks
 # in its own namespace for various information when instantiating the service.
+#
+# == Service Control Protocol Definition
 #
 # #add_action defines a service's action.  The action's arguments follow the
 # name as arrays of direction (IN, OUT, RETVAL), argument name, and related
@@ -37,7 +47,14 @@ require 'soap/rpc/standaloneServer'
 # type, allowed values, default value and whether or not the variable is
 # evented.
 #
-# = Instantiating  a UPnP::Service
+# == Implementing methods
+#
+# Define a regular ruby method matching the name in add_action for soap4r to
+# call when it receives a request.  It will be called with the IN parameters
+# in order.  The method needs to return an Array of OUT parameters in-order.
+# If there is no RETVAL, the first item in the Array should be nil.
+#
+# = Instantiating a UPnP::Service
 #
 # A UPnP::Service will be instantiated automatically for you if you call
 # add_service in the UPnP::Device initialization block.  If you want to
@@ -50,6 +67,19 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   # Base service error class
 
   class Error < UPnP::Error
+  end
+
+  ##
+  # Adds the s:encodingStyle to the SOAP envelope rs equired by UPnP
+
+  class Filter < SOAP::Filter::Handler
+
+    def on_outbound(envelope, opt)
+      opt[:generate_explicit_type] = false
+      envelope.extraattr['s:encodingStyle'] = SOAP::EncodingNamespace
+      envelope
+    end
+
   end
 
   ##
@@ -126,7 +156,13 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
     @device = device
     @type = type
 
+    # HACK PS3 disobeys spec
+    SOAP::NS::KNOWN_TAG[type_urn] = 'u'
+    SOAP::NS::KNOWN_TAG[SOAP::EnvelopeNamespace] = 's'
+
     super @type, type_urn
+
+    filterchain.add Filter.new
 
     add_actions
   end
@@ -142,8 +178,17 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   # Adds RPC actions to this service
 
   def add_actions
+    opts = {
+      :request_style => :rpc,
+      :response_style => :rpc,
+      :request_use => :encoded,
+      :response_use => :literal,
+    }
+
     actions.each do |name, params|
-      add_rpc_method self, name, params
+      qname = XSD::QName.new @default_namespace, name
+      param_def = SOAP::RPC::SOAPMethod.derive_rpc_param_def self, name, params
+      @router.add_method self, qname, nil, name, param_def, opts
     end
   end
 
@@ -151,7 +196,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   # The control URL for this service
 
   def control_url
-    File.join device_path, @type, 'control'
+    File.join service_path, 'control'
   end
 
   ##
@@ -195,7 +240,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   # The event subscription url for this service
 
   def event_sub_url
-    File.join device_path, @type, 'event_sub'
+    File.join service_path, 'event_sub'
   end
 
   ##
@@ -210,7 +255,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   end
 
   ##
-  # Loads data and initializes the server.
+  # Loads data and initializes the server
 
   def marshal_load(data)
     device = data.shift
@@ -219,6 +264,12 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
     initialize device, type
 
     add_actions
+  end
+
+  ##
+  # Callback to mount extra WEBrick servlets
+
+  def mount_extra(http_server)
   end
 
   ##
@@ -256,10 +307,10 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
         xml.action do
           xml.name name
           xml.argumentList do
-            arguments.each do |arg_name, direction, state_variable|
+            arguments.each do |direction, arg_name, state_variable|
               xml.argument do
-                xml.name arg_name
                 xml.direction direction
+                xml.name arg_name
                 xml.relatedStateVariable state_variable
               end
             end
@@ -295,6 +346,13 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   # The SCPD url for this service
 
   def scpd_url
+    service_path
+  end
+
+  ##
+  # The HTTP path to this service
+
+  def service_path
     File.join device_path, @type
   end
 

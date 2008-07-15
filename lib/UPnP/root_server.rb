@@ -31,13 +31,18 @@ class UPnP::RootServer < WEBrick::HTTPServer
   def initialize(root_device)
     @root_device = root_device
 
+    server_info = "RubyUPnP/#{UPnP::VERSION}"
+    device_info = "Ruby#{root_device.type}/#{root_device.version}"
+    @server_version = [server_info, 'UPnP/1.0', device_info].join ' '
+
     @scpds = {}
 
-    @logger = WEBrick::Log.new '/dev/null', WEBrick::BasicLog::FATAL
+    @logger = WEBrick::Log.new $stderr, WEBrick::BasicLog::FATAL
 
     super :Logger => @logger, :Port => 0
 
     mount_proc '/description', method(:description)
+    mount_proc '/',            method(:root)
   end
 
   ##
@@ -57,7 +62,10 @@ class UPnP::RootServer < WEBrick::HTTPServer
   def mount_server(path, server)
     server.config[:Logger] = @logger
 
-    mount_proc path do |req, res| server.service req, res end
+    mount_proc path do |req, res|
+      server.service req, res
+
+    end
   end
 
   ##
@@ -66,8 +74,44 @@ class UPnP::RootServer < WEBrick::HTTPServer
   def mount_service(service)
     mount_server service.control_url, service.server
 
+    service.mount_extra self
+
     @scpds[service.scpd_url] = service
     mount_proc service.scpd_url, method(:scpd)
+  end
+
+  ##
+  # A generic display page for the webserver root
+
+  def root(req, res)
+    raise WEBrick::HTTPStatus::NotFound, "`#{req.path}' not found." unless
+      req.path == '/'
+
+    res['content-type'] = 'text/html'
+
+    devices = @root_device.devices[1..-1].map do |d|
+      "<li>#{d.friendly_name} - #{d.type}"
+    end.join "\n"
+
+    services = @root_device.services.map do |s|
+      "<li>#{s.type}"
+    end.join "\n"
+
+    res.body = <<-EOF
+<title>#{@root_device.friendly_name} - #{@root_device.type}</title>
+
+<p>Devices:
+
+<ul>
+#{devices}
+</ul>
+
+<p>Services:
+
+<ul>
+#{services}
+</ul>
+    EOF
   end
 
   ##
@@ -80,6 +124,13 @@ class UPnP::RootServer < WEBrick::HTTPServer
 
     res['content-type'] = 'text/xml'
     res.body << service.scpd
+  end
+
+  def service(req, res)
+    super
+
+    res['Server'] = @server_version
+    res['EXT'] = ''
   end
 
 end

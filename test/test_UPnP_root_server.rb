@@ -23,7 +23,8 @@ class TestUPnPRootServer < UPnP::TestCase
   def test_initialize
     assert_equal @device, @root_server.root_device
     assert @root_server.scpds.empty?
-    assert_equal WEBrick::BasicLog::FATAL, @root_server.logger.level
+    assert_equal WEBrick::BasicLog::FATAL, @root_server.logger.level,
+                 'default log level'
 
     assert util_mount_tab['/description']
   end

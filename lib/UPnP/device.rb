@@ -231,6 +231,18 @@ class UPnP::Device
   def initialize(type, friendly_name, parent_device = nil)
     @type = type
     @friendly_name = friendly_name
+
+    @manufacturer ||= nil
+    @manufacturer_url ||= nil
+
+    @model_description ||= nil
+    @model_name ||= nil
+    @model_number ||= nil
+    @model_url ||= nil
+
+    @serial_number ||= nil
+    @upc ||= nil
+
     @sub_devices ||= []
     @sub_services ||= []
     @parent ||= parent_device
@@ -238,6 +250,8 @@ class UPnP::Device
     yield self if block_given?
 
     @name ||= "uuid:#{UPnP::UUID.generate}"
+
+    @ssdp = nil
   end
 
   ##
@@ -271,9 +285,12 @@ class UPnP::Device
   # Adds a UPnP::Service of +type+
 
   def add_service(type)
-    service = UPnP::Service.create self, type
-    @sub_services << service
-    service
+    sub_service = @sub_services.find { |s| s.type == type }
+    return sub_service if sub_service
+
+    sub_service = UPnP::Service.create self, type
+    @sub_services << sub_service
+    sub_service
   end
 
   ##
@@ -283,12 +300,12 @@ class UPnP::Device
   def advertise
     addrinfo = Socket.getaddrinfo Socket.gethostname, 0, Socket::AF_INET,
                                   Socket::SOCK_STREAM
-    hosts = addrinfo.map { |type, port, host, ip,| ip }.uniq
+    @hosts = addrinfo.map { |type, port, host, ip,| ip }.uniq
 
-    Thread.start do
+    @advertise_thread = Thread.start do
       Thread.abort_on_exception = true
 
-      UPnP::SSDP.new.advertise root_device, @server[:Port], hosts
+      ssdp.advertise root_device, @server[:Port], @hosts
     end
   end
 
@@ -482,6 +499,10 @@ class UPnP::Device
   # Shut down this device
 
   def shutdown
+    @advertise_thread.kill if @advertise_thread
+
+    ssdp.byebye self, @hosts
+
     @server.shutdown
   end
 
@@ -496,6 +517,18 @@ class UPnP::Device
     end
 
     @server
+  end
+
+  ##
+  # UPnP::SSDP accessor
+
+  def ssdp
+    return @ssdp if @ssdp
+
+    @ssdp = UPnP::SSDP.new
+    @ssdp.log = @server[:Logger]
+
+    @ssdp
   end
 
   ##
