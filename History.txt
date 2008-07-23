@@ -1,8 +1,10 @@
-=== 1.1.0 / ??
+=== 1.1.0 / 2008-07-23
 
 * 2 major enhancements
   * Server support
   * SSDP now supports sending advertisements
+* 1 bug fix
+  * Gem dependencies now listed
 
 === 1.0.0 / 2008-06-25
 

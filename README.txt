@@ -22,6 +22,7 @@ An implementation of the UPnP protocol
   * Advertises UPnP devices and services via SSDP
   * Creates a SOAP RPC server for each service
   * Mounts services in a single WEBrick server
+  * Easy creation of executables for devices
 * Eventing not implemented
 
 == SYNOPSIS:

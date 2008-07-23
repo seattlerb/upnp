@@ -414,7 +414,7 @@ class UPnP::Device
 
   def add_service(type, &block)
     sub_service = @sub_services.find { |s| s.type == type }
-    block.call sub_service if block
+    block.call sub_service if sub_service and block
     return sub_service if sub_service
 
     sub_service = UPnP::Service.create(self, type, &block)
