@@ -37,7 +37,13 @@ class UPnP::RootServer < WEBrick::HTTPServer
 
     @scpds = {}
 
-    @logger = WEBrick::Log.new $stderr, WEBrick::BasicLog::FATAL
+    level = if @root_device.class.debug? then
+              WEBrick::BasicLog::DEBUG
+            else
+              WEBrick::BasicLog::FATAL
+            end
+
+    @logger = WEBrick::Log.new $stderr, level
 
     super :Logger => @logger, :Port => 0
 

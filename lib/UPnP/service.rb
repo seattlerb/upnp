@@ -141,9 +141,9 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   # Creates a new service under +device+ of the given +type+.  Requires a
   # concrete subclass of UPnP::Service.
 
-  def self.create(device, type)
+  def self.create(device, type, &block)
     klass = const_get type
-    klass.new device, type
+    klass.new(device, type, &block)
   rescue NameError => e
     raise unless e.message =~ /UPnP::Service::#{type}/
     raise Error, "unknown service type #{type}"
@@ -152,7 +152,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   ##
   # Creates a new service under +device+ of the given +type+
 
-  def initialize(device, type)
+  def initialize(device, type, &block)
     @device = device
     @type = type
 
@@ -165,6 +165,8 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
     filterchain.add Filter.new
 
     add_actions
+
+    yield self if block_given?
   end
 
   ##

@@ -73,6 +73,24 @@ require 'fileutils'
 #
 # After instantiating a device it will advertise itself to the network when
 # you call #run.
+#
+# = Creating a UPnP device executable
+#
+# All the methods you need to create a UPnP device executable are built-in,
+# you only need to override option_parser and ::run in your UPnP::Device
+# subclass.  See the documentation below for details.
+#
+# When you're done, create an executable file, require your device file, and
+# call ::run on your class:
+#
+#   #!/usr/bin/env ruby
+#   
+#   require 'rubygems'
+#   require 'UPnP/device/my_device'
+#   
+#   UPnP::Device::MyDevice.run
+#
+# Mark it as executable, and you are good to go!
 
 class UPnP::Device
 
@@ -169,6 +187,9 @@ class UPnP::Device
 
   attr_accessor :upc
 
+  @option_parser = nil
+  @options = nil
+
   def self.add_service_id(service, id)
     SERVICE_IDS[self][service] = id
   end
@@ -207,6 +228,20 @@ class UPnP::Device
   end
 
   ##
+  # True when in debug mode
+
+  def self.debug?
+    @debug ||= false
+  end
+
+  ##
+  # Set debug mode to +value+
+
+  def self.debug=(value)
+    @debug = value
+  end
+
+  ##
   # Creates an instance of the UPnP::Device subclass named +type+ if it is in
   # the UPnP::Device namespace.
 
@@ -222,6 +257,98 @@ class UPnP::Device
     else
       super
     end
+  end
+
+  ##
+  # Creates a new OptionParser and yields the option parser and an options
+  # hash for adding a banner or setting device-specific command line
+  # arguments.
+  #
+  # Example:
+  #
+  #   def self.option_parser
+  #     super do |option_parser, options|
+  #       options[:name] = Socket.gethostname.split('.', 2).first
+  #   
+  #       option_parser.banner = <<-EOF
+  #   Usage: #{option_parser.program_name} [options]
+  #   
+  #   Starts a thingy with the stuff...
+  #       EOF
+  #   
+  #       option_parser.on '-n', '--name=NAME', 'Set the name' do |value|
+  #         options[:name] = value
+  #       end
+  #     end
+  #   end
+  #
+  # option_parser automatically provides debug, help and version options.  See
+  # also OptionParser in ri for more information on working with OptionParser.
+
+  def self.option_parser
+    require 'optparse'
+
+    @options = {}
+
+    @option_parser = OptionParser.new do |option_parser|
+      option_parser.version = if const_defined? :VERSION then
+                                self::VERSION
+                              else
+                                UPnP::VERSION
+                              end
+
+      option_parser.summary_indent = ' ' * 4
+
+      yield option_parser, @options
+
+      option_parser.program_name = File.basename $0 unless
+        option_parser.program_name
+
+      unless option_parser.banner then
+        option_parser.banner = "Usage: #{option_parser.program_name} [options]"
+      end
+
+      option_parser.separator ''
+
+      option_parser.on('--[no-]debug', 'Provide extra logging') do |value|
+        @debug = value
+      end
+    end
+  end
+
+  ##
+  # Processes +argv+, but must be overridden in a subclass to
+  # create and run the device.
+  #
+  # Override this in a subclass. The overriden run should super, then #create
+  # a device using @options as parsed by option_parser, then call #run on the
+  # created device.
+  #
+  # Example:
+  #
+  #  def self.run(argv = ARGV)
+  #    super
+  #  
+  #    device = create 'MyDevice' do |md|
+  #      md.manufacturer = '...'
+  #      # device-specific setup
+  #    end
+  #  
+  #    device.run
+  #  end
+  #
+  # run takes care of invalid arguments and options for you by printing out
+  # the help followed by the invalid argument.
+
+  def self.run(argv = ARGV)
+    option_parser.parse argv
+  rescue OptionParser::InvalidOption, OptionParser::InvalidArgument,
+         OptionParser::NeedlessArgument => e
+    puts option_parser
+    puts
+    puts e
+
+    exit 1
   end
 
   ##
@@ -282,13 +409,15 @@ class UPnP::Device
   end
 
   ##
-  # Adds a UPnP::Service of +type+
+  # Adds a UPnP::Service of +type+.  +block+ is passed to the created service
+  # for service-specific setup.
 
-  def add_service(type)
+  def add_service(type, &block)
     sub_service = @sub_services.find { |s| s.type == type }
+    block.call sub_service if block
     return sub_service if sub_service
 
-    sub_service = UPnP::Service.create self, type
+    sub_service = UPnP::Service.create(self, type, &block)
     @sub_services << sub_service
     sub_service
   end

@@ -217,7 +217,9 @@ class UPnP::Control::Service
 
   def self.create(description, url)
     type = description.elements['serviceType'].text.strip
-    klass_name = type.sub(/#{UPnP::SERVICE_SCHEMA_PREFIX}:([^:]+):.*/, '\1')
+
+    # HACK need vendor namespaces
+    klass_name = type.sub(/urn:[^:]+:service:([^:]+):.*/, '\1')
 
     begin
       klass = const_get klass_name
@@ -386,6 +388,7 @@ class UPnP::Control::Service
     range = [minimum, maximum, step]
 
     range.map do |value|
+      value = value.text
       value =~ /\./ ? Float(value) : Integer(value)
     end
   end
