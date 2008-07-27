@@ -104,6 +104,13 @@ class TestUPnPDevice < UPnP::TestCase
     assert @device.sub_services.include?(@service)
   end
 
+  def test_cache_dir
+    assert_match %r%.UPnP/_cache/uuid:.{8}-.{4}-.{4}-.{4}-.{12}$%,
+                 @device.cache_dir
+
+    assert File.exist?(@device.cache_dir)
+  end
+
   def test_description
     desc = @device.description
 

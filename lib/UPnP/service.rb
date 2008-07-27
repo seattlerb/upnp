@@ -156,6 +156,8 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
     @device = device
     @type = type
 
+    @cache_dir = nil
+
     # HACK PS3 disobeys spec
     SOAP::NS::KNOWN_TAG[type_urn] = 'u'
     SOAP::NS::KNOWN_TAG[SOAP::EnvelopeNamespace] = 's'
@@ -192,6 +194,20 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
       param_def = SOAP::RPC::SOAPMethod.derive_rpc_param_def self, name, params
       @router.add_method self, qname, nil, name, param_def, opts
     end
+  end
+
+  ##
+  # A directory for storing service-specific persistent data
+
+  def cache_dir
+    return @cache_dir if @cache_dir
+
+    @cache_dir = File.join '~', '.UPnP', '_cache', "#{@device.name}-#{@type}"
+    @cache_dir = File.expand_path @cache_dir
+
+    FileUtils.mkdir_p @cache_dir
+
+    @cache_dir
   end
 
   ##

@@ -48,6 +48,13 @@ class TestUPnPService < UPnP::TestCase
     assert_equal [qname], operations.keys
   end
 
+  def test_cache_dir
+    assert_match %r%.UPnP/_cache/uuid:.{8}-.{4}-.{4}-.{4}-.{12}-TestService$%,
+                 @service.cache_dir
+
+    assert File.exist?(@service.cache_dir)
+  end
+
   def test_control_url
     assert_equal '/TestDevice/TestService/control', @service.control_url
   end

@@ -378,6 +378,8 @@ class UPnP::Device
     @sub_services ||= []
     @parent ||= parent_device
 
+    @cache_dir = nil
+
     yield self if block_given?
 
     @name ||= "uuid:#{UPnP::UUID.generate}"
@@ -440,6 +442,20 @@ class UPnP::Device
 
       ssdp.advertise root_device, @server[:Port], @hosts
     end
+  end
+
+  ##
+  # A directory for storing device-specific persistent data
+
+  def cache_dir
+    return @cache_dir if @cache_dir
+
+    @cache_dir = File.join '~', '.UPnP', '_cache', @name
+    @cache_dir = File.expand_path @cache_dir
+
+    FileUtils.mkdir_p @cache_dir
+
+    @cache_dir
   end
 
   ##
