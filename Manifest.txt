@@ -14,6 +14,7 @@ lib/UPnP/control/service.rb
 lib/UPnP/device.rb
 lib/UPnP/root_server.rb
 lib/UPnP/service.rb
+lib/UPnP/test_utilities.rb
 test/test_UPnP_SSDP.rb
 test/test_UPnP_SSDP_notification.rb
 test/test_UPnP_SSDP_response.rb
