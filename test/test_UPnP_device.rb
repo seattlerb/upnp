@@ -1,6 +1,7 @@
 require 'test/unit'
 require 'test/utilities'
 require 'UPnP/device'
+require 'UPnP/test_utilities'
 
 class TestUPnPDevice < UPnP::TestCase
 
@@ -16,6 +17,11 @@ class TestUPnPDevice < UPnP::TestCase
     @sub_device.model_name = 'UPnP Sub Model'
 
     @service = @device.add_service 'TestService'
+  end
+
+  def test_self_add_serivce_id
+    assert_equal 'urn:example-com:serviceId:TestService',
+                 @device.service_id(@service)
   end
 
   def test_self_create
@@ -120,7 +126,7 @@ class TestUPnPDevice < UPnP::TestCase
     <serviceList>
       <service>
         <serviceType>urn:schemas-upnp-org:service:TestService:1</serviceType>
-        <serviceId>urn:upnp-org:serviceId:TestService</serviceId>
+        <serviceId>urn:example-com:serviceId:TestService</serviceId>
         <SCPDURL>/TestDevice/TestService</SCPDURL>
         <controlURL>/TestDevice/TestService/control</controlURL>
         <eventSubURL>/TestDevice/TestService/event_sub</eventSubURL>
@@ -235,11 +241,15 @@ class TestUPnPDevice < UPnP::TestCase
   end
 
   def test_service_id
-    assert_equal 'TestService', @device.service_id(@service)
+    assert_equal 'urn:example-com:serviceId:TestService',
+                 @device.service_id(@service)
   end
 
   def test_service_ids
-    expected = { UPnP::Service::TestService => 'TestService' }
+    expected = {
+      UPnP::Service::TestService => 'urn:example-com:serviceId:TestService'
+    }
+
     assert_equal expected, @device.service_ids
   end
 

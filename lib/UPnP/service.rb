@@ -216,7 +216,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   def description(xml)
     xml.service do
       xml.serviceType type_urn
-      xml.serviceId   "urn:upnp-org:serviceId:#{root_device.service_id self}"
+      xml.serviceId   root_device.service_id(self)
       xml.SCPDURL     scpd_url
       xml.controlURL  control_url
       xml.eventSubURL event_sub_url

@@ -2,6 +2,7 @@ require 'test/unit'
 require 'test/utilities'
 require 'UPnP/SSDP'
 require 'UPnP/device'
+require 'UPnP/test_utilities'
 
 class TestUPnPSSDP < UPnP::TestCase
 
@@ -293,7 +294,7 @@ ST: bunnies\r
   end
 
   def util_device_version
-    "UPnP::Device::TestDevice/#{UPnP::VERSION}"
+    "UPnP::Device::TestDevice/#{UPnP::Device::TestDevice::VERSION}"
   end
 
 end

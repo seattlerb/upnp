@@ -1,6 +1,7 @@
 require 'test/unit'
 require 'test/utilities'
 require 'UPnP/service'
+require 'UPnP/test_utilities'
 
 class TestUPnPService < UPnP::TestCase
 
@@ -64,7 +65,7 @@ class TestUPnPService < UPnP::TestCase
     expected = <<-XML
 <service>
   <serviceType>urn:schemas-upnp-org:service:TestService:1</serviceType>
-  <serviceId>urn:upnp-org:serviceId:TestService</serviceId>
+  <serviceId>urn:example-com:serviceId:TestService</serviceId>
   <SCPDURL>/TestDevice/TestService</SCPDURL>
   <controlURL>/TestDevice/TestService/control</controlURL>
   <eventSubURL>/TestDevice/TestService/event_sub</eventSubURL>

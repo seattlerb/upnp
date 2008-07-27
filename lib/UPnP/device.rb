@@ -190,8 +190,12 @@ class UPnP::Device
   @option_parser = nil
   @options = nil
 
-  def self.add_service_id(service, id)
-    SERVICE_IDS[self][service] = id
+  ##
+  # Sets the serivceId for +service+ using +domain+ and +id+.  Used in
+  # UPnP::Service#description via #description.
+
+  def self.add_service_id(service, id, domain = 'upnp.org')
+    SERVICE_IDS[self][service] = "urn:#{domain.tr '.', '-'}:serviceId:#{id}"
   end
 
   ##
