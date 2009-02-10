@@ -1,3 +1,8 @@
+=== 1.2.0 / ??
+
+* X minor enhancements
+  * Workaround for missing socket constants on Windows.  Reported by Yuri.
+
 === 1.1.0 / 2008-07-23
 
 * 2 major enhancements
