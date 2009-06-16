@@ -22,8 +22,13 @@ Prints information about UPnP internet gateway devices
 ssdp.timeout = timeout
 
 devices = ssdp.search(:root).map do |resource|
-  UPnP::Control::Device.new resource.location
-end
+  begin
+    UPnP::Control::Device.new resource.location
+  rescue UPnP::Error => e
+    puts "Error creating device:\n\t#{e}"
+    nil
+  end
+end.compact
 
 if devices.empty? then
   puts 'No UPnP devices found'
@@ -72,8 +77,12 @@ devices.each do |device|
     puts "    Event subscription URL: #{service.event_sub_url}"
     puts
     puts "    Actions:"
-    service.driver.methods(false).sort.each do |method|
-      puts "      #{method}"
+    service.actions.sort.each do |method, arguments|
+      inn, out = arguments.partition { |dir,| dir == 'in' }
+      out = out.map { |dir, name,| name }
+      out = out.empty? ? '' : " => #{out.join ', '}"
+      inn = inn.map { |dir, name,| name }
+      puts "      #{method}(#{inn.join ', '})#{out}"
     end
 
     puts

@@ -176,6 +176,16 @@ class UPnP::Control::Service
   end
 
   ##
+  # Hash mapping UPnP Actions to arguments
+  #
+  #   {
+  #     'GetTotalPacketsSent' =>
+  #       [['out', 'NewTotalPacketsSent', 'TotalPacketsSent']]
+  #   }
+
+  attr_reader :actions
+
+  ##
   # Control URL
 
   attr_reader :control_url
@@ -278,7 +288,6 @@ class UPnP::Control::Service
 
     @driver.mapping_registry = mapping_registry
 
-    @actions = nil
     @variables = nil
   end
 
@@ -406,6 +415,8 @@ class UPnP::Control::Service
 
     service_state_table = description.elements['scpd/serviceStateTable']
     parse_service_state_table service_state_table
+  rescue OpenURI::HTTPError
+    raise Error, "Unable to open SCPD at #{@scpd_url.inspect} from device #{@url.inspect}"
   end
 
   ##
