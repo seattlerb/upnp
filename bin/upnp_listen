@@ -8,18 +8,30 @@ ssdp = UPnP::SSDP.new
 ssdp.discover do |notification|
   schemas = Regexp.union UPnP::DEVICE_SCHEMA_PREFIX, UPnP::SERVICE_SCHEMA_PREFIX
 
-  type = notification.type.sub(/#{schemas}:/, '')
+  case notification
+  when UPnP::SSDP::Notification then
+    type = notification.type.sub(/#{schemas}:/, '')
 
-  if notification.alive? then
-    puts "#{type} is alive"
-    puts "Description: #{notification.location}"
-    expiration = notification.expiration.strftime '%c'
-    puts "Valid until #{expiration}"
-  else
-    puts "#{type} says byebye"
+    if notification.alive? then
+      puts "#{type} is alive"
+      puts "Description: #{notification.location}"
+    else
+      puts "#{type} says byebye"
+    end
+
+    puts "USN: #{notification.name}"
+  when UPnP::SSDP::Response then
+    puts "Response from #{target}" 
+    puts "Description: #{location}"
+    puts "USN: #{notification.name}"
+  when UPnP::SSDP::Search then
+    puts "Search for #{notification.target}"
   end
 
-  puts "USN: #{notification.name}"
+  if notification.expiration then
+    expiration = notification.expiration.strftime '%c'
+    puts "Valid until #{expiration}"
+  end
 
   puts
 end

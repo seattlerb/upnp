@@ -45,14 +45,14 @@ class UPnP::SSDP
     # Expiration time of this advertisement
 
     def expiration
-      date + max_age
+      date + max_age if date and max_age
     end
 
     ##
     # True if this advertisement has expired
 
     def expired?
-      Time.now > expiration
+      Time.now > expiration if expiration
     end
 
   end
@@ -304,6 +304,13 @@ class UPnP::SSDP
     end
 
     ##
+    # Expiration time of this advertisement
+
+    def expiration
+      date + wait_time
+    end
+
+    ##
     # A friendlier inspect
 
     def inspect
@@ -536,11 +543,11 @@ class UPnP::SSDP
           adv = parse response
 
           info = case adv
-          when Notification then adv.type
-          when Response     then adv.target
-          when Search       then adv.target
-          else                   'unknown'
-          end
+                 when Notification then adv.type
+                 when Response     then adv.target
+                 when Search       then adv.target
+                 else                   'unknown'
+                 end
 
           response =~ /\A(\S+)/
           log :debug, "SSDP recv #{$1} #{hostname}:#{port} #{info}"
