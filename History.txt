@@ -1,7 +1,15 @@
-=== 1.2.0 / ??
+=== 1.2.0 / 2009-06-16
 
-* X minor enhancements
+* 2 minor enhancements
   * Workaround for missing socket constants on Windows.  Reported by Yuri.
+  * upnp_discover now shows action argument and return value names.
+
+* 4 bug fixes
+  * Method name must not include entire URI.  Reported by Ian Macdonald.
+  * Step in allowedValueRange is optional.  Reported by Ian Macdonald.
+  * upnp_listen works with all notification types.  Reported by Ian Macdonald.
+  * upnp_discover now warns when a device failed to instantiate.  Reported by
+    Ian Macdonald.
 
 === 1.1.0 / 2008-07-23
 
@@ -14,6 +22,5 @@
 === 1.0.0 / 2008-06-25
 
 * 1 major enhancement
-
   * Birthday!
 
