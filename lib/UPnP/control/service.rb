@@ -259,7 +259,7 @@ class UPnP::Control::Service
 
     @actions.each do |name, arguments|
       soapaction = "#{@type}##{name}"
-      qname = XSD::QName.new @type, soapaction
+      qname = XSD::QName.new @type, name
 
       # TODO map ranges, enumerations
       arguments = arguments.map do |direction, arg_name, variable|
@@ -385,7 +385,8 @@ class UPnP::Control::Service
     maximum = range.elements['maximum']
     step    = range.elements['step']
 
-    range = [minimum, maximum, step]
+    range = [minimum, maximum]
+    range << step if step
 
     range.map do |value|
       value = value.text
