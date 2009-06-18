@@ -64,12 +64,12 @@ class TestUPnPService < UPnP::TestCase
   end
 
   def test_description
-    desc = ''
-    xml = Builder::XmlMarkup.new :indent => 2, :target => desc
-
-    @service.description xml
+    builder = Nokogiri::XML::Builder.new do |xml|
+      @service.description xml
+    end
 
     expected = <<-XML
+<?xml version="1.0"?>
 <service>
   <serviceType>urn:schemas-upnp-org:service:TestService:1</serviceType>
   <serviceId>urn:example-com:serviceId:TestService</serviceId>
@@ -79,7 +79,7 @@ class TestUPnPService < UPnP::TestCase
 </service>
     XML
 
-    assert_equal expected, desc
+    assert_equal expected, builder.to_xml
   end
 
   def test_device_path
@@ -115,7 +115,7 @@ class TestUPnPService < UPnP::TestCase
     scpd = @service.scpd
 
     expected = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0"?>
 <scpd xmlns="urn:schemas-upnp-org:service-1-0">
   <specVersion>
     <major>1</major>

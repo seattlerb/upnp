@@ -118,7 +118,7 @@ class TestUPnPDevice < UPnP::TestCase
                      'uuid:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX')
 
     expected = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0"?>
 <root xmlns="urn:schemas-upnp-org:device-1-0">
   <specVersion>
     <major>1</major>
@@ -156,15 +156,17 @@ class TestUPnPDevice < UPnP::TestCase
   end
 
   def test_device_description
-    desc = ''
-    xml = Builder::XmlMarkup.new :indent => 2, :target => desc
+    builder = Nokogiri::XML::Builder.new do |xml|
+      @sub_device.device_description xml
+    end
 
-    @sub_device.device_description xml
+    desc = builder.to_xml
 
     desc = desc.gsub(/uuid:.{8}-.{4}-.{4}-.{4}-.{12}/,
                      'uuid:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX')
 
     expected = <<-XML
+<?xml version="1.0"?>
 <device>
   <deviceType>urn:schemas-upnp-org:device:TestDevice:1</deviceType>
   <UDN>uuid:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX</UDN>

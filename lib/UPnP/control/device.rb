@@ -1,6 +1,7 @@
 require 'open-uri'
-require 'rexml/document'
 require 'uri'
+
+require 'nokogiri'
 
 require 'UPnP'
 require 'UPnP/SSDP'
@@ -114,10 +115,10 @@ class UPnP::Control::Device
   # used.
 
   def self.create(device_url)
-    description = REXML::Document.new open(device_url)
+    description = Nokogiri::XML open(device_url)
     url = device_url + '/'
 
-    type = description.elements['root/device/deviceType'].text.strip
+    type = description.at('root > device > deviceType').text
     klass_name = type.sub(/#{UPnP::DEVICE_SCHEMA_PREFIX}:([^:]+):.*/, '\1')
 
     begin
@@ -127,7 +128,7 @@ class UPnP::Control::Device
       klass.const_set :URN_1, "#{UPnP::DEVICE_SCHEMA_PREFIX}:#{klass.name}:1"
     end
 
-    klass.new description.elements['root/device'], url
+    klass.new description.at('root > device'), url
   end
 
   ##
@@ -150,7 +151,7 @@ class UPnP::Control::Device
   end
 
   ##
-  # Creates a new Device from +device+ which can be an REXML::Element
+  # Creates a new Device from +device+ which can be an Nokogiri::XML::Element
   # describing the device or a URI for the device's description.  If an XML
   # description is provided, the parent device's +url+ must also be provided.
 
@@ -163,60 +164,62 @@ class UPnP::Control::Device
 
     case device
     when URI::Generic then
-      description = REXML::Document.new open(device)
+      description = Nokogiri::XML open(device)
 
-      @url = description.elements['root/URLBase']
+      @url = description.at 'root > URLBase'
       @url = @url ? URI.parse(@url.text.strip) : device + '/'
 
-      device = parse_device description.elements['root/device']
-    when REXML::Element then
-      raise ArgumentError, 'url not provided with REXML::Element' if url.nil?
+      device = parse_device description.at('root > device')
+    when Nokogiri::XML::Element then
+      raise ArgumentError, 'url not provided with Nokogiri::XML::Element' if
+        url.nil?
       @url = url
       parse_device device
     else
-      raise ArgumentError, 'must be a URI or an REXML::Element'
+      raise ArgumentError, 'must be a URI or a Nokogiri::XML::Element'
     end
   end
 
   ##
-  # Parses the REXML::Element +description+ and fills in various attributes,
-  # sub-devices and sub-services
+  # Parses the Nokogiri::XML::Element +description+ and fills in various
+  # attributes, sub-devices and sub-services
 
   def parse_device(description)
-    @friendly_name = description.elements['friendlyName'].text.strip
+    @friendly_name = description.at('friendlyName').text.strip
 
-    @manufacturer = description.elements['manufacturer'].text.strip
+    @manufacturer = description.at('manufacturer').text.strip
 
-    manufacturer_url = description.elements['manufacturerURL']
+    manufacturer_url = description.at('manufacturerURL')
     @manufacturer_url = URI.parse manufacturer_url.text.strip if
       manufacturer_url
 
-    model_description = description.elements['modelDescription']
+    model_description = description.at 'modelDescription'
     @model_description = model_description.text.strip if model_description
 
-    @model_name = description.elements['modelName'].text.strip
+    @model_name = description.at('modelName').text.strip
 
-    model_number = description.elements['modelNumber']
+    model_number = description.at 'modelNumber'
     @model_number = model_number.text.strip if model_number
 
-    model_url = description.elements['modelURL']
+    model_url = description.at 'modelURL'
     @model_url = URI.parse model_url.text.strip if model_url
 
-    @name = description.elements['UDN'].text.strip
+    @name = description.at('UDN').text.strip
 
-    presentation_url = description.elements['presentationURL']
+    presentation_url = description.at 'presentationURL'
     @presentation_url = URI.parse presentation_url.text.strip if
       presentation_url
 
-    serial_number = description.elements['serialNumber']
+    serial_number = description.at 'serialNumber'
     @serial_number = serial_number.text.strip if serial_number
 
-    @type = description.elements['deviceType'].text.strip
+    @type = description.at('deviceType').text.strip
 
-    upc = description.elements['UPC']
+    upc = description.at 'UPC'
     @upc = upc.text.strip if upc
 
-    description.each_element 'deviceList/device' do |sub_device_description|
+    sub_devices = description.xpath './xmlns:deviceList/xmlns:device'
+    sub_devices.each do |sub_device_description|
       sub_device = UPnP::Control::Device.new sub_device_description, @url
       @sub_devices << sub_device
     end
@@ -225,7 +228,8 @@ class UPnP::Control::Device
       [device, device.devices]
     end.flatten
 
-    description.each_element 'serviceList/service' do |service_description|
+    sub_services = description.xpath './xmlns:serviceList/xmlns:service'
+    sub_services.each do |service_description|
       service = UPnP::Control::Service.create service_description, @url
       @sub_services << service
     end

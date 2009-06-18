@@ -227,7 +227,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   end
 
   ##
-  # Adds a description of this service to XML::Builder +xml+
+  # Adds a description of this service to the Nokogiri::XML::Builder +xml+
 
   def description(xml)
     xml.service do
@@ -301,23 +301,22 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   # The SCPD for this service
 
   def scpd
-    xml = Builder::XmlMarkup.new :indent => 2
-    xml.instruct!
+    Nokogiri::XML::Builder.new do |xml|
+      xml.scpd :xmlns => SCHEMA_URN do
+        xml.specVersion do
+          xml.major 1
+          xml.minor 0
+        end
 
-    xml.scpd :xmlns => SCHEMA_URN do
-      xml.specVersion do
-        xml.major 1
-        xml.minor 0
+        scpd_action_list xml
+
+        scpd_service_state_table xml
       end
-
-      scpd_action_list xml
-
-      scpd_service_state_table xml
-    end
+    end.to_xml
   end
 
   ##
-  # Adds the SCPD actionList to XML::Builder +xml+.
+  # Adds the SCPD actionList to the Nokogiri::XML::Builder +xml+.
 
   def scpd_action_list(xml)
     xml.actionList do
@@ -339,7 +338,7 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
   end
 
   ##
-  # Adds the SCPD serviceStateTable to XML::Builder +xml+.
+  # Adds the SCPD serviceStateTable to the Nokogiri::XML::Builder +xml+.
 
   def scpd_service_state_table(xml)
     xml.serviceStateTable do

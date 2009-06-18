@@ -18,8 +18,8 @@ class TestUPnPControlService < UPnP::TestCase
 </service>
     XML
 
-    service_description = REXML::Document.new service_description
-    @service_description = service_description.elements['service']
+    service_description = Nokogiri::XML service_description
+    @service_description = service_description.at('service')
 
     UPnP::Control::Service::FILES[@url + '/L3F.xml'] = StringIO.new L3F_XML
 

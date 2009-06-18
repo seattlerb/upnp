@@ -3,8 +3,9 @@ require 'UPnP/SSDP'
 require 'UPnP/UUID'
 require 'UPnP/root_server'
 require 'UPnP/service'
-require 'builder'
 require 'fileutils'
+
+require 'nokogiri'
 
 ##
 # A device contains sub devices, services and holds information about the
@@ -464,21 +465,18 @@ class UPnP::Device
   def description
     validate
 
-    description = []
+    builder = Nokogiri::XML::Builder.new do |xml|
+      xml.root :xmlns => SCHEMA_URN do
+        xml.specVersion do
+          xml.major 1
+          xml.minor 0
+        end
 
-    xml = Builder::XmlMarkup.new :indent => 2, :target => description
-    xml.instruct!
-
-    xml.root :xmlns => SCHEMA_URN do
-      xml.specVersion do
-        xml.major 1
-        xml.minor 0
+        root_device.device_description xml
       end
-
-      root_device.device_description xml
     end
 
-    description.join
+    builder.to_xml
   end
 
   ##

@@ -11,7 +11,9 @@ module UPnP
 
     def open(path)
       if URI::Generic === path or path =~ /^http:/ then
-        UPnP::OpenStub::FILES[path] or raise "#{path} not found"
+        io = UPnP::OpenStub::FILES[path] or raise "#{path} not found"
+        io.rewind
+        io
       else
         super
       end

@@ -2,10 +2,11 @@ require 'UPnP/control'
 
 require 'date'
 require 'open-uri'
-require 'rexml/document'
 require 'soap/rpc/driver'
 require 'time'
 require 'uri'
+
+require 'nokogiri'
 
 ##
 # A service on a UPnP control point.
@@ -226,7 +227,7 @@ class UPnP::Control::Service
   # used.
 
   def self.create(description, url)
-    type = description.elements['serviceType'].text.strip
+    type = description.at('serviceType').text.strip
 
     # HACK need vendor namespaces
     klass_name = type.sub(/urn:[^:]+:service:([^:]+):.*/, '\1')
@@ -242,17 +243,17 @@ class UPnP::Control::Service
   end
 
   ##
-  # Creates a new service from REXML::Element +description+ and +url+.  The
+  # Creates a new service from Nokogiri::XML::Element +description+ and +url+.  The
   # description must be a service fragment from a device description.
 
   def initialize(description, url)
     @url = url
 
-    @type = description.elements['serviceType'].text.strip
-    @id = description.elements['serviceId'].text.strip
-    @control_url = @url + description.elements['controlURL'].text.strip
-    @event_sub_url = @url + description.elements['eventSubURL'].text.strip
-    @scpd_url = @url + description.elements['SCPDURL'].text.strip
+    @type = description.at('serviceType').text.strip
+    @id = description.at('serviceId').text.strip
+    @control_url = @url + description.at('controlURL').text.strip
+    @event_sub_url = @url + description.at('eventSubURL').text.strip
+    @scpd_url = @url + description.at('SCPDURL').text.strip
 
     create_driver
   end
@@ -333,13 +334,13 @@ class UPnP::Control::Service
   def parse_action_arguments(argument_list)
     arguments = []
 
-    argument_list.each_element 'argument' do |argument|
-      name = argument.elements['name'].text.strip
+    argument_list.css('argument').each do |argument|
+      name = argument.at('name').text.strip
 
-      direction = argument.elements['direction'].text.strip.upcase
-      direction = 'RETVAL' if argument.elements['retval']
+      direction = argument.at('direction').text.strip.upcase
+      direction = 'RETVAL' if argument.at 'retval'
       direction = SOAP::RPC::SOAPMethod.const_get direction
-      variable  = argument.elements['relatedStateVariable'].text.strip
+      variable  = argument.at('relatedStateVariable').text.strip
 
       arguments << [direction, name, variable]
     end if argument_list
@@ -353,13 +354,13 @@ class UPnP::Control::Service
   def parse_actions(action_list)
     @actions = {}
 
-    action_list.each_element 'action' do |action|
-      name = action.elements['name'].text.strip
+    action_list.css('action').each do |action|
+      name = action.at('name').text.strip
 
       raise Error, "insecure action name #{name}" unless name =~ /\A\w*\z/
 
 
-      @actions[name] = parse_action_arguments action.elements['argumentList']
+      @actions[name] = parse_action_arguments action.at('argumentList')
     end
   end
 
@@ -367,13 +368,13 @@ class UPnP::Control::Service
   # Extracts a list of allowed values from +state_variable+
 
   def parse_allowed_value_list(state_variable)
-    list = state_variable.elements['allowedValueList']
+    list = state_variable.at 'allowedValueList'
 
     return nil unless list
 
     values = []
 
-    list.each_element 'allowedValue' do |value|
+    list.css('allowedValue').each do |value|
       value = value.text.strip
       raise Error, "insecure allowed value #{value}" unless value =~ /\A\w*\z/
       values << value
@@ -386,13 +387,13 @@ class UPnP::Control::Service
   # Extracts an allowed value range from +state_variable+
 
   def parse_allowed_value_range(state_variable)
-    range = state_variable.elements['allowedValueRange']
+    range = state_variable.at 'allowedValueRange'
 
     return nil unless range
 
-    minimum = range.elements['minimum']
-    maximum = range.elements['maximum']
-    step    = range.elements['step']
+    minimum = range.at 'minimum'
+    maximum = range.at 'maximum'
+    step    = range.at 'step'
 
     range = [minimum, maximum]
     range << step if step
@@ -407,13 +408,13 @@ class UPnP::Control::Service
   # Parses a service description from the scpd_url
 
   def parse_service_description
-    description = REXML::Document.new open(@scpd_url)
+    description = Nokogiri::XML open(@scpd_url)
 
     validate_scpd description
 
-    parse_actions description.elements['scpd/actionList']
+    parse_actions description.at('scpd > actionList')
 
-    service_state_table = description.elements['scpd/serviceStateTable']
+    service_state_table = description.at 'scpd > serviceStateTable'
     parse_service_state_table service_state_table
   rescue OpenURI::HTTPError
     raise Error, "Unable to open SCPD at #{@scpd_url.inspect} from device #{@url.inspect}"
@@ -425,10 +426,10 @@ class UPnP::Control::Service
   def parse_service_state_table(service_state_table)
     @variables = {}
 
-    service_state_table.each_element 'stateVariable' do |var|
-      name = var.elements['name'].text.strip
-      data_type = Types::MAP[var.elements['dataType'].text.strip]
-      default = var.elements['defaultValue']
+    service_state_table.css('stateVariable').each do |var|
+      name = var.at('name').text.strip
+      data_type = Types::MAP[var.at('dataType').text.strip]
+      default = var.at 'defaultValue'
 
       if default then
         default = default.text.strip
@@ -460,13 +461,13 @@ class UPnP::Control::Service
   # version numbers.  Raises an exception if the service isn't valid.
 
   def validate_scpd(service_description)
-    namespace = service_description.elements["//scpd"].namespace
+    namespace = service_description.at('scpd').namespace.href
 
     raise Error, "invalid namespace #{namespace}" unless
       namespace == 'urn:schemas-upnp-org:service-1-0'
 
-    major = service_description.elements["//scpd/specVersion/major"].text.strip
-    minor = service_description.elements["//scpd/specVersion/minor"].text.strip
+    major = service_description.at('scpd > specVersion > major').text.strip
+    minor = service_description.at('scpd > specVersion > minor').text.strip
 
     raise Error, "invalid version #{major}.#{minor}" unless
       major == '1' and minor == '0'
