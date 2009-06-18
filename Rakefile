@@ -9,7 +9,7 @@ Hoe.spec 'UPnP' do
   self.rubyforge_name = 'seattlerb'
   developer 'Eric Hodel', 'drbrain@segment7.net'
 
-  extra_deps << 'nokogiri'
+  extra_deps << ['nokogiri', '~> 1.3']
   extra_deps << 'soap4r'
 end
 
