@@ -2,8 +2,6 @@ $KCODE = 'u'
 
 require 'rubygems'
 gem 'soap4r'
-require 'nokogiri'
-require 'xsd/xmlparser/nokogiri' # use Nokogiri in soap4r
 
 ##
 # An implementation of the Universal Plug and Play protocol.

@@ -7,6 +7,7 @@ require 'time'
 require 'uri'
 
 require 'nokogiri'
+require 'xsd/xmlparser/nokogiri'
 
 ##
 # A service on a UPnP control point.

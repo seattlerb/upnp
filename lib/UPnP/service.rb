@@ -1,6 +1,8 @@
 require 'UPnP'
 require 'soap/rpc/standaloneServer'
 require 'soap/filter/handler'
+require 'nokogiri'
+require 'xsd/xmlparser/nokogiri'
 
 ##
 # A service contains a SOAP endpoint and the Service Control Protocol
@@ -31,7 +33,7 @@ require 'soap/filter/handler'
 #   
 #       [nil, result]
 #     end
-#     
+#   
 #   end
 #
 # Subclass UPnP::Service in the UPnP::Service namespace.  UPnP::Service looks
