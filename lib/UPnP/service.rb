@@ -1,4 +1,5 @@
 require 'UPnP'
+require 'UPnP/soap_registry'
 require 'soap/rpc/standaloneServer'
 require 'soap/filter/handler'
 require 'nokogiri'
@@ -167,6 +168,8 @@ class UPnP::Service < SOAP::RPC::StandaloneServer
     super @type, type_urn
 
     filterchain.add Filter.new
+
+    mapping_registry = UPnP::SOAPRegistry.new
 
     add_actions
 

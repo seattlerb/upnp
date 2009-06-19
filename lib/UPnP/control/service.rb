@@ -1,4 +1,5 @@
 require 'UPnP/control'
+require 'UPnP/soap_registry'
 
 require 'date'
 require 'open-uri'
@@ -60,37 +61,6 @@ class UPnP::Control::Service
 
     def to_s
       "#{@description} (#{@code})"
-    end
-
-  end
-
-  ##
-  # UPnP relies on the client to do type conversions.  This registry casts the
-  # SOAPString returned by the service into the real SOAP type so soap4r can
-  # make the conversion.
-
-  class Registry < SOAP::Mapping::EncodedRegistry
-
-    ##
-    # If +node+ is a simple type, cast it to the real type from the registered
-    # definition and super, otherwise just let EncodedRegistry do the work.
-
-    def soap2obj(node, klass = nil)
-      case node
-      when XSD::XSDAnySimpleType then
-        definition = find_node_definition node
-
-        return super if definition.nil?
-
-        new_class = definition.class_for
-        new_node = new_class.new node.data
-
-        return super(new_node, klass)
-      when SOAP::SOAPStruct then
-        return '' if node.members.empty?
-      end
-
-      super
     end
 
   end
@@ -267,7 +237,7 @@ class UPnP::Control::Service
 
     @driver = SOAP::RPC::Driver.new @control_url, @type
 
-    mapping_registry = Registry.new
+    mapping_registry = UPnP::SOAPRegistry.new
 
     @actions.each do |name, arguments|
       soapaction = "#{@type}##{name}"
