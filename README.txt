@@ -1,12 +1,15 @@
 = UPnP
 
-* http://seattlerb.org/UPnP
+* http://seattlerb.rubyforge.org/UPnP
 * http://upnp.org
 * Bugs: http://rubyforge.org/tracker/?atid=5921&group_id=1513
 
 == DESCRIPTION:
 
-An implementation of the UPnP protocol
+An implementation of the UPnP 1.0 protocol for devices, services and control
+points.  UPnP allows automatic configuration of networked devices.  It is an
+open protocol including device discovery using SSDP and service control using
+SOAP.
 
 == FEATURES/PROBLEMS:
 
